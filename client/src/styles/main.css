@@ -10,34 +10,40 @@ body {
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    font-size: 16px; /* Base font size for readability */
 }
 
+/* Responsive header */
 header {
     background-color: #1a3a61;
     color: white;
-    padding: 1rem 2rem;
+    padding: 1rem;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
+    text-align: center;
 }
 
 header h1 {
     font-size: 1.5rem;
+    margin-bottom: 10px;
 }
 
 #map-controls {
     display: flex;
     gap: 10px;
+    margin-top: 10px;
 }
 
 #map-controls button {
     background-color: rgba(255,255,255,0.2);
     color: white;
     border: none;
-    padding: 8px 15px;
+    padding: 10px 15px;
     border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.3s ease;
+    min-height: 44px; /* WCAG accessibility */
 }
 
 #map-controls button.active {
@@ -48,61 +54,66 @@ header h1 {
 #map {
     flex-grow: 1;
     width: 100%;
-    height: 100%;
+    height: calc(100vh - 120px); /* Adjust based on header/footer height */
 }
 
 #recording-panel {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     background: white;
     padding: 20px;
     border-radius: 5px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     z-index: 1;
-    width: 300px;
+    width: 90%;
+    max-width: 400px;
 }
 
-#recording-panel.hidden {
-    display: none;
-}
-
-#location-display {
-    background-color: #f0f0f0;
-    padding: 10px;
-    margin-bottom: 10px;
-    border-radius: 5px;
-}
-
-.marker {
-    width: 30px;
-    height: 30px;
-    background-color: #1a3a61;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 3px solid white;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-}
-
-button {
-    padding: 8px 12px;
-    margin: 5px 0;
-    border: none;
-    border-radius: 4px;
-    background: #1a3a61;
-    color: white;
-    cursor: pointer;
-}
-
-button:disabled {
-    background: #cccccc;
-}
-
-#recording-description {
+/* Responsive form elements */
+#recording-description, #audio {
     width: 100%;
-    height: 80px;
+    padding: 12px;
     margin: 10px 0;
-    padding: 8px;
+    font-size: 16px; /* Prevent auto-zoom on iOS */
+    min-height: 44px; /* WCAG accessibility */
+}
+
+/* Button styles */
+button {
+    width: 100%;
+    padding: 12px;
+    min-height: 44px; /* WCAG accessibility */
+    margin: 10px 0;
+}
+
+/* Media query for small screens */
+@media screen and (max-width: 600px) {
+    header {
+        padding: 0.5rem;
+    }
+    
+    header h1 {
+        font-size: 1.2rem;
+    }
+    
+    #map-controls button {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+}
+
+/* Storage indicator */
+.storage-indicator {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background-color: rgba(255,255,255,0.8);
+    padding: 10px;
+    border-radius: 5px;
+    z-index: 1000;
+    font-size: 0.8rem;
 }
 
 footer {
@@ -111,9 +122,4 @@ footer {
     text-align: center;
     padding: 10px;
     width: 100%;
-}
-
-.recording-popup audio {
-    width: 100%;
-    margin-top: 10px;
 }
