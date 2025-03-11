@@ -12,13 +12,17 @@ document.addEventListener('DOMContentLoaded', () => {
     mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
     
     map = new mapboxgl.Map({
-        container: 'map',
-        style: MAPBOX_STYLE_URL,
-        center: [106.6953, 10.7719], // Ho Chi Minh City coordinates
-        zoom: 12,
-        pitch: 45,
-        bearing: -17.6
-    });
+    container: 'map',
+    style: MAPBOX_STYLE_URL,
+    center: [106.6953, 10.7719], // Ho Chi Minh City coordinates
+    zoom: 12,
+    pitch: 45,
+    bearing: -17.6,
+    maxBounds: [
+        [106.4, 10.5], // Southwest coordinates
+        [107.0, 11.0]  // Northeast coordinates
+    ]
+});
     
     map.addControl(new mapboxgl.NavigationControl());
     

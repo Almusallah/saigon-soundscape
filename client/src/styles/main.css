@@ -70,3 +70,13 @@ button:disabled {
     margin: 10px 0;
     padding: 8px;
 }
+footer {
+    background-color: #1a3a61;
+    color: white;
+    text-align: center;
+    padding: 10px;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
+}
