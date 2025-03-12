@@ -11,6 +11,14 @@ const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
 
 // DOM elements
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, checking for mapboxgl...');
+    
+    if (!window.mapboxgl) {
+        console.error('mapboxgl is not defined! Mapbox script may not have loaded correctly.');
+        alert('Error: Map library failed to load. Please check your internet connection and try again.');
+        return;
+    }
+    
     const streetViewBtn = document.getElementById('street-view-btn');
     const satelliteViewBtn = document.getElementById('satellite-view-btn');
     const recordAudioBtn = document.getElementById('record-audio');
@@ -21,162 +29,171 @@ document.addEventListener('DOMContentLoaded', () => {
     const uploadForm = document.getElementById('upload-form');
 
     // Initialize map
-    mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
-    
-    map = new mapboxgl.Map({
-        container: 'map',
-        style: STREET_STYLE_URL,
-        center: [106.6953, 10.7719], // Ho Chi Minh City coordinates
-        zoom: 12,
-        pitch: 45,
-        bearing: -17.6,
-        maxBounds: [
-            [106.4, 10.5], // Southwest coordinates
-            [107.0, 11.0]  // Northeast coordinates
-        ]
-    });
-    
-    map.addControl(new mapboxgl.NavigationControl());
-    
-    // Store markers globally so we can reload them
-    let recordingMarkers = [];
-    
-    // Load existing recordings when map loads
-    map.on('load', () => {
-        loadRecordings();
-    });
-    
-    // Map style switching with proper event handling
-    streetViewBtn.addEventListener('click', () => {
-        // Save current map state
-        const currentCenter = map.getCenter();
-        const currentZoom = map.getZoom();
+    try {
+        console.log('Initializing map...');
+        mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
         
-        map.setStyle(STREET_STYLE_URL);
-        streetViewBtn.classList.add('active');
-        satelliteViewBtn.classList.remove('active');
+        map = new mapboxgl.Map({
+            container: 'map',
+            style: STREET_STYLE_URL,
+            center: [106.6953, 10.7719], // Ho Chi Minh City coordinates
+            zoom: 12,
+            pitch: 45,
+            bearing: -17.6,
+            maxBounds: [
+                [106.4, 10.5], // Southwest coordinates
+                [107.0, 11.0]  // Northeast coordinates
+            ]
+        });
         
-        // Reload markers when style loads
-        map.once('style.load', () => {
-            // Restore map state
-            map.setCenter(currentCenter);
-            map.setZoom(currentZoom);
-            // Reload markers
+        map.on('error', (e) => {
+            console.error('Map error:', e);
+        });
+        
+        console.log('Map initialized successfully');
+        map.addControl(new mapboxgl.NavigationControl());
+        
+        // Store markers globally so we can reload them
+        let recordingMarkers = [];
+        
+        // Load existing recordings when map loads
+        map.on('load', () => {
+            console.log('Map loaded');
             loadRecordings();
         });
-    });
+        
+        // Map style switching with proper event handling
+        streetViewBtn.addEventListener('click', () => {
+            // Save current map state
+            const currentCenter = map.getCenter();
+            const currentZoom = map.getZoom();
+            
+            map.setStyle(STREET_STYLE_URL);
+            streetViewBtn.classList.add('active');
+            satelliteViewBtn.classList.remove('active');
+            
+            // Reload markers when style loads
+            map.once('style.load', () => {
+                // Restore map state
+                map.setCenter(currentCenter);
+                map.setZoom(currentZoom);
+                // Reload markers
+                loadRecordings();
+            });
+        });
 
-    satelliteViewBtn.addEventListener('click', () => {
-        // Save current map state
-        const currentCenter = map.getCenter();
-        const currentZoom = map.getZoom();
-        
-        map.setStyle(SATELLITE_STYLE_URL);
-        satelliteViewBtn.classList.add('active');
-        streetViewBtn.classList.remove('active');
-        
-        // Reload markers when style loads
-        map.once('style.load', () => {
-            // Restore map state
-            map.setCenter(currentCenter);
-            map.setZoom(currentZoom);
-            // Reload markers
-            loadRecordings();
+        satelliteViewBtn.addEventListener('click', () => {
+            // Save current map state
+            const currentCenter = map.getCenter();
+            const currentZoom = map.getZoom();
+            
+            map.setStyle(SATELLITE_STYLE_URL);
+            satelliteViewBtn.classList.add('active');
+            streetViewBtn.classList.remove('active');
+            
+            // Reload markers when style loads
+            map.once('style.load', () => {
+                // Restore map state
+                map.setCenter(currentCenter);
+                map.setZoom(currentZoom);
+                // Reload markers
+                loadRecordings();
+            });
         });
-    });
-    
-    // Handle map clicks for recording location
-    map.on('click', (e) => {
-        selectedLocation = e.lngLat;
-        locationDisplay.textContent = `Selected: ${selectedLocation.lat.toFixed(4)}, ${selectedLocation.lng.toFixed(4)}`;
-        recordingPanel.classList.remove('hidden');
         
-        // Add a marker
-        if (userMarker) userMarker.remove();
-        userMarker = new mapboxgl.Marker()
-            .setLngLat(selectedLocation)
-            .addTo(map);
-    });
+        // Handle map clicks for recording location
+        map.on('click', (e) => {
+            selectedLocation = e.lngLat;
+            locationDisplay.textContent = `Selected: ${selectedLocation.lat.toFixed(4)}, ${selectedLocation.lng.toFixed(4)}`;
+            recordingPanel.classList.remove('hidden');
+            
+            // Add a marker
+            if (userMarker) userMarker.remove();
+            userMarker = new mapboxgl.Marker()
+                .setLngLat(selectedLocation)
+                .addTo(map);
+        });
+    } catch (error) {
+        console.error('Error initializing map:', error);
+    }
 
     // Audio recording handlers
     recordAudioBtn.addEventListener('click', startRecording);
     stopRecordBtn.addEventListener('click', stopRecording);
 
-   // Function to start recording with better mobile support
-async function startRecording() {
-    try {
-        // Check if browser supports getUserMedia
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert('Your browser does not support audio recording');
-            return;
-        }
-        
-        console.log('Requesting audio access...');
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true
-            } 
-        });
-        console.log('Audio access granted');
-        
-        // Try different audio formats for better compatibility
-        const options = {
-            mimeType: 'audio/webm;codecs=opus'
-        };
-        
-        // Check if the browser supports this format
-        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-            console.log('audio/webm;codecs=opus not supported, trying audio/webm');
-            options.mimeType = 'audio/webm';
+    // Function to start recording with better mobile support
+    async function startRecording() {
+        try {
+            // Check if browser supports getUserMedia
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('Your browser does not support audio recording');
+                return;
+            }
             
+            console.log('Requesting audio access...');
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                } 
+            });
+            console.log('Audio access granted');
+            
+            // Try different audio formats for better compatibility
+            const options = {
+                mimeType: 'audio/webm;codecs=opus'
+            };
+            
+            // Check if the browser supports this format
             if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                console.log('audio/webm not supported, trying audio/mp4');
-                options.mimeType = 'audio/mp4';
+                console.log('audio/webm;codecs=opus not supported, trying audio/webm');
+                options.mimeType = 'audio/webm';
                 
                 if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    console.log('audio/mp4 not supported, using default format');
-                    delete options.mimeType;
+                    console.log('audio/webm not supported, trying audio/mp4');
+                    options.mimeType = 'audio/mp4';
+                    
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                        console.log('audio/mp4 not supported, using default format');
+                        delete options.mimeType;
+                    }
                 }
             }
-        }
-        
-        console.log('Using MIME type:', options.mimeType || 'default');
-        mediaRecorder = new MediaRecorder(stream, options);
-        const audioChunks = [];
-        
-        mediaRecorder.addEventListener('dataavailable', event => {
-            console.log('Data available event, data size:', event.data.size);
-            audioChunks.push(event.data);
-        });
-        
-        mediaRecorder.addEventListener('stop', () => {
-            console.log('Recording stopped, chunks:', audioChunks.length);
-            recordedBlob = new Blob(audioChunks, { 
-                type: options.mimeType || 'audio/webm' 
+            
+            console.log('Using MIME type:', options.mimeType || 'default');
+            mediaRecorder = new MediaRecorder(stream, options);
+            const audioChunks = [];
+            
+            mediaRecorder.addEventListener('dataavailable', event => {
+                console.log('Data available event, data size:', event.data.size);
+                audioChunks.push(event.data);
             });
-            console.log('Created blob, size:', recordedBlob.size);
-            const audioURL = URL.createObjectURL(recordedBlob);
-            audioPreview.src = audioURL;
-            audioPreview.style.display = 'block';
             
-            // Stop tracks to release the microphone
-            stream.getTracks().forEach(track => track.stop());
-        });
-        
-        // Start recording
-        mediaRecorder.start();
-        console.log('Recording started');
-        recordAudioBtn.disabled = true;
-        stopRecordBtn.disabled = false;
-    } catch (error) {
-        console.error('Error starting recording:', error);
-        alert('Failed to start recording: ' + error.message);
+            mediaRecorder.addEventListener('stop', () => {
+                console.log('Recording stopped, chunks:', audioChunks.length);
+                recordedBlob = new Blob(audioChunks, { 
+                    type: options.mimeType || 'audio/webm' 
+                });
+                console.log('Created blob, size:', recordedBlob.size);
+                const audioURL = URL.createObjectURL(recordedBlob);
+                audioPreview.src = audioURL;
+                audioPreview.style.display = 'block';
+                
+                // Stop tracks to release the microphone
+                stream.getTracks().forEach(track => track.stop());
+            });
+            
+            // Start recording
+            mediaRecorder.start();
+            console.log('Recording started');
+            recordAudioBtn.disabled = true;
+            stopRecordBtn.disabled = false;
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            alert('Failed to start recording: ' + error.message);
+        }
     }
-} 
-            
-           
     
     // Function to stop recording
     function stopRecording() {
@@ -191,8 +208,10 @@ async function startRecording() {
     async function loadRecordings() {
         try {
             // Clear existing markers
-            recordingMarkers.forEach(marker => marker.remove());
-            recordingMarkers = [];
+            if (recordingMarkers && recordingMarkers.forEach) {
+                recordingMarkers.forEach(marker => marker.remove());
+                recordingMarkers = [];
+            }
             
             const response = await fetch(`${API_URL}/recordings`);
             if (!response.ok) {
@@ -236,66 +255,64 @@ async function startRecording() {
         }
     }
 
-   // Handle recording upload
-uploadForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    if (!selectedLocation) {
-        alert('Please select a location on the map');
-        return;
-    }
-    
-    if (!recordedBlob) {
-        alert('Please record a sound first');
-        return;
-    }
-
-    const description = document.getElementById('recording-description').value;
-
-    // Create form data
-    const formData = new FormData();
-    formData.append('audio', recordedBlob, 'recording.webm');
-    formData.append('description', description);
-    formData.append('lat', selectedLocation.lat);
-    formData.append('lng', selectedLocation.lng);
-
-    try {
-        console.log('Attempting to upload to:', `${API_URL}/recordings`);
-        const response = await fetch(`${API_URL}/recordings`, {
-            method: 'POST',
-            body: formData,
-            // Add these headers to help with CORS issues
-            headers: {
-                'Accept': 'application/json',
-            },
-            // Include credentials if your API uses cookies/sessions
-            credentials: 'include',
-        });
-
-        console.log('Upload response status:', response.status);
+    // Handle recording upload
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
         
-        if (response.ok) {
-            // Reload recordings to show the new marker
-            loadRecordings();
-            
-            // Reset form and hide panel
-            uploadForm.reset();
-            recordingPanel.classList.add('hidden');
-            audioPreview.src = '';
-            audioPreview.style.display = 'none';
-            recordedBlob = null;
-            
-            alert('Recording uploaded successfully!');
-        } else {
-            const errorText = await response.text();
-            console.error('Server response:', errorText);
-            throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+        if (!selectedLocation) {
+            alert('Please select a location on the map');
+            return;
         }
-    } catch (error) {
-        console.error('Upload error details:', error);
-        alert(`Failed to upload recording: ${error.message}`);
-    }
-});
-     
-    
+        
+        if (!recordedBlob) {
+            alert('Please record a sound first');
+            return;
+        }
+
+        const description = document.getElementById('recording-description').value;
+
+        // Create form data
+        const formData = new FormData();
+        formData.append('audio', recordedBlob, 'recording.webm');
+        formData.append('description', description);
+        formData.append('lat', selectedLocation.lat);
+        formData.append('lng', selectedLocation.lng);
+
+        try {
+            console.log('Attempting to upload to:', `${API_URL}/recordings`);
+            const response = await fetch(`${API_URL}/recordings`, {
+                method: 'POST',
+                body: formData,
+                // Add these headers to help with CORS issues
+                headers: {
+                    'Accept': 'application/json',
+                },
+                // Include credentials if your API uses cookies/sessions
+                credentials: 'include',
+            });
+
+            console.log('Upload response status:', response.status);
             
+            if (response.ok) {
+                // Reload recordings to show the new marker
+                loadRecordings();
+                
+                // Reset form and hide panel
+                uploadForm.reset();
+                recordingPanel.classList.add('hidden');
+                audioPreview.src = '';
+                audioPreview.style.display = 'none';
+                recordedBlob = null;
+                
+                alert('Recording uploaded successfully!');
+            } else {
+                const errorText = await response.text();
+                console.error('Server response:', errorText);
+                throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+            }
+        } catch (error) {
+            console.error('Upload error details:', error);
+            alert(`Failed to upload recording: ${error.message}`);
+        }
+    });
+});
