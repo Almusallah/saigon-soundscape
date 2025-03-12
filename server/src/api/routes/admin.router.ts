@@ -8,7 +8,6 @@ const router = Router();
 router.post('/login', AdminController.login);
 router.delete('/recordings/:id', authMiddleware, AdminController.deleteRecording);
 
-// Add storage usage endpoint
 router.get('/storage-usage', async (req, res) => {
   try {
     const storageInfo = await BackblazeStorage.getStorageUsage();
