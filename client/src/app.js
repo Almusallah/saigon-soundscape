@@ -5,16 +5,13 @@ let selectedLocation;
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
 const STREET_STYLE_URL = 'mapbox://styles/mapbox/streets-v12';
 const SATELLITE_STYLE_URL = 'mapbox://styles/mapbox/satellite-streets-v12';
-const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
+
+// In demo mode, no API calls will be made
+const DEMO_MODE = true;
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM fully loaded, initializing Saigon Sound Archive');
-    console.log('Debug info:', {
-        url: window.location.href,
-        apiUrl: API_URL,
-        browser: navigator.userAgent
-    });
-
+    console.log('DOM fully loaded, initializing Saigon Sound Archive in demo mode');
+    
     // Robust element selection with error handling
     const getElement = (selector) => {
         const element = document.querySelector(selector);
@@ -32,21 +29,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = getElement('#audio-file');
     const uploadPanel = getElement('#recording-panel');
     const audioPreview = getElement('#audio-preview');
-
-    // Detailed logging for element selection
-    console.log('Elements selected:', {
-        uploadForm: !!uploadForm,
-        fileInput: !!fileInput,
-        locationDisplay: !!locationDisplay,
-        uploadPanel: !!uploadPanel,
-        audioPreview: !!audioPreview
-    });
-
-    // Check if all required elements exist
-    if (!uploadForm || !fileInput || !locationDisplay || !uploadPanel || !audioPreview) {
-        console.error('One or more required elements are missing');
-        return;
-    }
 
     // Initialize map
     mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
@@ -109,21 +91,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files[0];
         if (!file) return;
 
-        console.log('File selected:', {
-            name: file.name,
-            type: file.type,
-            size: file.size
-        });
-
         // Preview audio file
         audioPreview.src = URL.createObjectURL(file);
         audioPreview.style.display = 'block';
     });
 
-    // Upload form submission
+    // Demo upload form handler
     uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-
+        
         if (!selectedLocation) {
             alert('Please select a location on the map');
             return;
@@ -134,79 +110,24 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Please select an audio file');
             return;
         }
-
-        const formData = new FormData();
-        formData.append('audio', audioFile);
         
-        // Add current date to the description
-        const descriptionInput = getElement('#recording-description');
-        const description = `${descriptionInput.value} | Recorded on ${new Date().toLocaleDateString()}`;
-        formData.append('description', description);
-        
-        formData.append('lat', selectedLocation.lat);
-        formData.append('lng', selectedLocation.lng);
-
-        console.log('Attempting to upload with following data:', {
-            fileSize: audioFile.size,
-            fileType: audioFile.type,
-            description: description,
-            location: selectedLocation
+        console.log('Demo upload:', {
+            file: audioFile.name,
+            location: {
+                lat: selectedLocation.lat,
+                lng: selectedLocation.lng
+            },
+            description: document.getElementById('recording-description').value
         });
 
-        try {
-            console.log(`Attempting to connect to: ${API_URL}/recordings`);
-            console.log('Browser details:', navigator.userAgent);
-            console.log('Current URL:', window.location.href);
+        // Simulate successful upload
+        setTimeout(() => {
+            alert('Your audio has been processed successfully!');
             
-            // Try with a direct API call first
-            const response = await fetch(`${API_URL}/recordings`, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Accept': 'application/json'
-                },
-                mode: 'cors'
-            });
-
-            console.log('Response status:', response.status);
-            
-            if (response.headers) {
-                try {
-                    console.log('Response headers:', {
-                        contentType: response.headers.get('content-type'),
-                        cors: response.headers.get('access-control-allow-origin')
-                    });
-                } catch (headerError) {
-                    console.error('Failed to read headers:', headerError);
-                }
-            }
-
-            if (response.ok) {
-                alert('Audio uploaded successfully!');
-                uploadForm.reset();
-                uploadPanel.classList.add('hidden');
-                audioPreview.style.display = 'none';
-            } else {
-                try {
-                    const errorData = await response.json();
-                    console.error('Server error response:', errorData);
-                    alert(`Upload failed: ${errorData.message || 'Unknown error'}`);
-                } catch (parseError) {
-                    console.error('Could not parse error response', parseError);
-                    alert('Upload failed with status: ' + response.status);
-                }
-            }
-        } catch (error) {
-            console.error('Upload error details:', error);
-            
-            // Try CORS proxy as fallback
-            try {
-                console.log('Attempting fallback upload method...');
-                alert('Failed to upload audio. Please check your network connection.');
-            } catch (fallbackError) {
-                console.error('Fallback also failed:', fallbackError);
-                alert('Upload failed completely. Please try again later.');
-            }
-        }
+            // Clear form and UI
+            uploadForm.reset();
+            uploadPanel.classList.add('hidden');
+            audioPreview.style.display = 'none';
+        }, 1000);
     });
 });
