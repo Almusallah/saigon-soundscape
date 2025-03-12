@@ -2,48 +2,59 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saigon Sound Archive</title>
-    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
-    <!-- Add Mapbox Geocoder CSS -->
-    <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" rel="stylesheet" type="text/css">
-    <link rel="stylesheet" href="/src/styles/main.css">
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        .map-controls { 
+            position: absolute; 
+            top: 10px; 
+            right: 10px; 
+            z-index: 1; 
+        }
+        .map-controls button { 
+            margin: 5px; 
+            padding: 5px 10px; 
+        }
+        .hidden { display: none; }
+        #recording-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #location-display {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <h1>Saigon Sound Archive</h1>
-        <div id="map-controls">
-            <button id="street-view-btn" class="active">Street View</button>
-            <button id="satellite-view-btn">Satellite View</button>
-        </div>
-    </header>
-
     <div id="map"></div>
     
+    <div class="map-controls">
+        <button id="street-view-btn" class="active">Street View</button>
+        <button id="satellite-view-btn">Satellite View</button>
+    </div>
+
+    <div id="location-display"></div>
+
     <div id="recording-panel" class="hidden">
-        <h3>Record a Sound</h3>
-        <div id="location-display">Select a location on the map</div>
-        
-        <div>
-            <button id="record-audio">Start Recording</button>
-            <button id="stop-record" disabled>Stop Recording</button>
-        </div>
-        
-        <audio id="audio-preview" controls style="display:none;"></audio>
-        
+        <h3>Upload Audio</h3>
         <form id="upload-form">
-            <textarea id="recording-description" placeholder="Describe the sound"></textarea>
-            <button type="submit">Upload Recording</button>
+            <input type="file" id="audio-file" accept="audio/*" required>
+            <audio id="audio-preview" controls style="display:none;"></audio>
+            <textarea id="recording-description" placeholder="Description (optional)"></textarea>
+            <button type="submit">Upload</button>
         </form>
     </div>
 
-    <footer>
-        <p>A Project developed by <strong>Officine Gặp</strong></p>
-    </footer>
-
-    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
-    <!-- Add Mapbox Geocoder JavaScript -->
-    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
-    <script src="/src/app.js"></script>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js'></script>
+    <script src="src/app.js"></script>
 </body>
 </html>
