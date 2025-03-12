@@ -60,12 +60,18 @@
         footer { 
             font-size: 0.9em; 
         }
+        footer a {
+            color: white;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <header>
         <h1>Saigon Sound Archive</h1>
-        <p>Capturing the Soundscape of Ho Chi Minh City</p>
     </header>
 
     <div class="content-wrapper">
@@ -83,15 +89,14 @@
             <form id="upload-form">
                 <input type="file" id="audio-file" accept="audio/*" required>
                 <audio id="audio-preview" controls style="display:none;"></audio>
-                <textarea id="recording-description" placeholder="Description (optional)"></textarea>
+                <textarea id="recording-description" placeholder="Description" required></textarea>
                 <button type="submit">Upload</button>
             </form>
         </div>
     </div>
 
     <footer>
-        <p>&copy; 2025 Saigon Sound Archive | Preserving Urban Soundscapes</p>
-        <p>A collaborative project documenting the acoustic environment of Ho Chi Minh City</p>
+        <p>&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a></p>
     </footer>
 
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js'></script>
