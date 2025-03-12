@@ -5,8 +5,33 @@
     <title>Saigon Sound Archive</title>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.css' rel='stylesheet' />
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; }
-        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+        body { 
+            margin: 0; 
+            font-family: Arial, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh; 
+        }
+        header, footer { 
+            background-color: #333; 
+            color: white; 
+            padding: 15px; 
+            text-align: center; 
+        }
+        header h1 { 
+            margin: 0; 
+            font-size: 1.5em; 
+        }
+        .content-wrapper { 
+            flex-grow: 1; 
+            position: relative; 
+        }
+        #map { 
+            position: absolute; 
+            top: 0; 
+            bottom: 0; 
+            width: 100%; 
+        }
         .map-controls { 
             position: absolute; 
             top: 10px; 
@@ -32,27 +57,42 @@
             text-align: center;
             margin-bottom: 10px;
         }
+        footer { 
+            font-size: 0.9em; 
+        }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    
-    <div class="map-controls">
-        <button id="street-view-btn" class="active">Street View</button>
-        <button id="satellite-view-btn">Satellite View</button>
+    <header>
+        <h1>Saigon Sound Archive</h1>
+        <p>Capturing the Soundscape of Ho Chi Minh City</p>
+    </header>
+
+    <div class="content-wrapper">
+        <div id="map"></div>
+        
+        <div class="map-controls">
+            <button id="street-view-btn" class="active">Street View</button>
+            <button id="satellite-view-btn">Satellite View</button>
+        </div>
+
+        <div id="location-display"></div>
+
+        <div id="recording-panel" class="hidden">
+            <h3>Upload Audio</h3>
+            <form id="upload-form">
+                <input type="file" id="audio-file" accept="audio/*" required>
+                <audio id="audio-preview" controls style="display:none;"></audio>
+                <textarea id="recording-description" placeholder="Description (optional)"></textarea>
+                <button type="submit">Upload</button>
+            </form>
+        </div>
     </div>
 
-    <div id="location-display"></div>
-
-    <div id="recording-panel" class="hidden">
-        <h3>Upload Audio</h3>
-        <form id="upload-form">
-            <input type="file" id="audio-file" accept="audio/*" required>
-            <audio id="audio-preview" controls style="display:none;"></audio>
-            <textarea id="recording-description" placeholder="Description (optional)"></textarea>
-            <button type="submit">Upload</button>
-        </form>
-    </div>
+    <footer>
+        <p>&copy; 2025 Saigon Sound Archive | Preserving Urban Soundscapes</p>
+        <p>A collaborative project documenting the acoustic environment of Ho Chi Minh City</p>
+    </footer>
 
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.9.1/mapbox-gl.js'></script>
     <script src="src/app.js"></script>
