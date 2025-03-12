@@ -1,20 +1,249 @@
-// (Previous code remains the same)
+// Initialize variables
+let map;
+let userMarker;
+let selectedLocation;
+let recordedBlob = null;
+let mediaRecorder = null;
+const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
+const STREET_STYLE_URL = 'mapbox://styles/mapbox/streets-v12';
+const SATELLITE_STYLE_URL = 'mapbox://styles/mapbox/satellite-streets-v12';
+const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
 
-// Modify the upload form submission handler
-const uploadForm = document.getElementById('upload-form');
-uploadForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
+// DOM elements
+document.addEventListener('DOMContentLoaded', () => {
+    const streetViewBtn = document.getElementById('street-view-btn');
+    const satelliteViewBtn = document.getElementById('satellite-view-btn');
+    const recordAudioBtn = document.getElementById('record-audio');
+    const stopRecordBtn = document.getElementById('stop-record');
+    const audioPreview = document.getElementById('audio-preview');
+    const recordingPanel = document.getElementById('recording-panel');
+    const locationDisplay = document.getElementById('location-display');
+    const uploadForm = document.getElementById('upload-form');
+
+    // Initialize map
+    mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
     
-    const audioFile = document.getElementById('audio').files[0];
+    map = new mapboxgl.Map({
+        container: 'map',
+        style: STREET_STYLE_URL,
+        center: [106.6953, 10.7719], // Ho Chi Minh City coordinates
+        zoom: 12,
+        pitch: 45,
+        bearing: -17.6,
+        maxBounds: [
+            [106.4, 10.5], // Southwest coordinates
+            [107.0, 11.0]  // Northeast coordinates
+        ]
+    });
     
-    // Check file size before upload
-    const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
-    if (audioFile.size > MAX_FILE_SIZE) {
-        alert('File is too large. Maximum file size is 30MB.');
-        return;
+    map.addControl(new mapboxgl.NavigationControl());
+    
+    // Store markers globally so we can reload them
+    let recordingMarkers = [];
+    
+    // Load existing recordings when map loads
+    map.on('load', () => {
+        loadRecordings();
+    });
+    
+    // Map style switching with proper event handling
+    streetViewBtn.addEventListener('click', () => {
+        // Save current map state
+        const currentCenter = map.getCenter();
+        const currentZoom = map.getZoom();
+        
+        map.setStyle(STREET_STYLE_URL);
+        streetViewBtn.classList.add('active');
+        satelliteViewBtn.classList.remove('active');
+        
+        // Reload markers when style loads
+        map.once('style.load', () => {
+            // Restore map state
+            map.setCenter(currentCenter);
+            map.setZoom(currentZoom);
+            // Reload markers
+            loadRecordings();
+        });
+    });
+
+    satelliteViewBtn.addEventListener('click', () => {
+        // Save current map state
+        const currentCenter = map.getCenter();
+        const currentZoom = map.getZoom();
+        
+        map.setStyle(SATELLITE_STYLE_URL);
+        satelliteViewBtn.classList.add('active');
+        streetViewBtn.classList.remove('active');
+        
+        // Reload markers when style loads
+        map.once('style.load', () => {
+            // Restore map state
+            map.setCenter(currentCenter);
+            map.setZoom(currentZoom);
+            // Reload markers
+            loadRecordings();
+        });
+    });
+    
+    // Handle map clicks for recording location
+    map.on('click', (e) => {
+        selectedLocation = e.lngLat;
+        locationDisplay.textContent = `Selected: ${selectedLocation.lat.toFixed(4)}, ${selectedLocation.lng.toFixed(4)}`;
+        recordingPanel.classList.remove('hidden');
+        
+        // Add a marker
+        if (userMarker) userMarker.remove();
+        userMarker = new mapboxgl.Marker()
+            .setLngLat(selectedLocation)
+            .addTo(map);
+    });
+
+    // Audio recording handlers
+    recordAudioBtn.addEventListener('click', startRecording);
+    stopRecordBtn.addEventListener('click', stopRecording);
+
+    // Function to start recording
+    async function startRecording() {
+        try {
+            // Check if browser supports getUserMedia
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('Your browser does not support audio recording');
+                return;
+            }
+            
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            const audioChunks = [];
+            
+            mediaRecorder.addEventListener('dataavailable', event => {
+                audioChunks.push(event.data);
+            });
+            
+            mediaRecorder.addEventListener('stop', () => {
+                recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioURL = URL.createObjectURL(recordedBlob);
+                audioPreview.src = audioURL;
+                audioPreview.style.display = 'block';
+                
+                // Stop tracks to release the microphone
+                stream.getTracks().forEach(track => track.stop());
+            });
+            
+            // Start recording
+            mediaRecorder.start();
+            recordAudioBtn.disabled = true;
+            stopRecordBtn.disabled = false;
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            alert('Failed to start recording: ' + error.message);
+        }
     }
     
-    // Rest of the existing upload logic remains the same
-});
+    // Function to stop recording
+    function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            recordAudioBtn.disabled = false;
+            stopRecordBtn.disabled = true;
+        }
+    }
 
-// (Rest of the previous code)
+    // Load recordings function
+    async function loadRecordings() {
+        try {
+            // Clear existing markers
+            recordingMarkers.forEach(marker => marker.remove());
+            recordingMarkers = [];
+            
+            const response = await fetch(`${API_URL}/recordings`);
+            if (!response.ok) {
+                throw new Error('API response: ' + response.status);
+            }
+            
+            const { data } = await response.json();
+            console.log('Loaded recordings:', data);
+
+            // Add markers for each recording
+            data.forEach(recording => {
+                // Create marker element
+                const markerElement = document.createElement('div');
+                markerElement.className = 'marker recording-marker';
+                
+                // Add marker to map
+                const marker = new mapboxgl.Marker(markerElement)
+                    .setLngLat(recording.location.coordinates)
+                    .addTo(map);
+                
+                // Add popup with recording details
+                const popup = new mapboxgl.Popup({ offset: 25 })
+                    .setHTML(`
+                        <div class="recording-popup">
+                            <h3>Sound Recording</h3>
+                            <p>${recording.description}</p>
+                            <audio controls>
+                                <source src="${recording.audioPath}" type="audio/webm">
+                                Your browser does not support the audio element.
+                            </audio>
+                        </div>
+                    `);
+                
+                marker.setPopup(popup);
+                
+                // Store marker reference for later cleanup
+                recordingMarkers.push(marker);
+            });
+        } catch (error) {
+            console.error('Error loading recordings:', error);
+        }
+    }
+
+    // Handle recording upload
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        if (!selectedLocation) {
+            alert('Please select a location on the map');
+            return;
+        }
+        
+        if (!recordedBlob) {
+            alert('Please record a sound first');
+            return;
+        }
+
+        const description = document.getElementById('recording-description').value;
+
+        // Create form data
+        const formData = new FormData();
+        formData.append('audio', recordedBlob, 'recording.webm');
+        formData.append('description', description);
+        formData.append('lat', selectedLocation.lat);
+        formData.append('lng', selectedLocation.lng);
+
+        try {
+            const response = await fetch(`${API_URL}/recordings`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                // Reload recordings to show the new marker
+                loadRecordings();
+                
+                // Reset form and hide panel
+                uploadForm.reset();
+                recordingPanel.classList.add('hidden');
+                audioPreview.src = '';
+                audioPreview.style.display = 'none';
+                recordedBlob = null;
+                
+                alert('Recording uploaded successfully!');
+            } else {
+                throw new Error('Upload failed: ' + response.status);
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Failed to upload recording: ' + error.message);
+        }
+    });
+});
