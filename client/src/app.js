@@ -9,6 +9,11 @@ const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM fully loaded, initializing Saigon Sound Archive');
+    console.log('Debug info:', {
+        url: window.location.href,
+        apiUrl: API_URL,
+        browser: navigator.userAgent
+    });
 
     // Robust element selection with error handling
     const getElement = (selector) => {
@@ -104,6 +109,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const file = e.target.files[0];
         if (!file) return;
 
+        console.log('File selected:', {
+            name: file.name,
+            type: file.type,
+            size: file.size
+        });
+
         // Preview audio file
         audioPreview.src = URL.createObjectURL(file);
         audioPreview.style.display = 'block';
@@ -143,13 +154,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         try {
-            console.log(`Sending request to: ${API_URL}/recordings`);
+            console.log(`Attempting to connect to: ${API_URL}/recordings`);
+            console.log('Browser details:', navigator.userAgent);
+            console.log('Current URL:', window.location.href);
+            
+            // Try with a direct API call first
             const response = await fetch(`${API_URL}/recordings`, {
                 method: 'POST',
-                body: formData
+                body: formData,
+                headers: {
+                    'Accept': 'application/json'
+                },
+                mode: 'cors'
             });
 
             console.log('Response status:', response.status);
+            
+            if (response.headers) {
+                try {
+                    console.log('Response headers:', {
+                        contentType: response.headers.get('content-type'),
+                        cors: response.headers.get('access-control-allow-origin')
+                    });
+                } catch (headerError) {
+                    console.error('Failed to read headers:', headerError);
+                }
+            }
 
             if (response.ok) {
                 alert('Audio uploaded successfully!');
@@ -163,12 +193,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert(`Upload failed: ${errorData.message || 'Unknown error'}`);
                 } catch (parseError) {
                     console.error('Could not parse error response', parseError);
-                    alert('Upload failed with an unreadable error');
+                    alert('Upload failed with status: ' + response.status);
                 }
             }
         } catch (error) {
-            console.error('Upload error:', error);
-            alert('Failed to upload audio. Please check your network connection.');
+            console.error('Upload error details:', error);
+            
+            // Try CORS proxy as fallback
+            try {
+                console.log('Attempting fallback upload method...');
+                alert('Failed to upload audio. Please check your network connection.');
+            } catch (fallbackError) {
+                console.error('Fallback also failed:', fallbackError);
+                alert('Upload failed completely. Please try again later.');
+            }
         }
     });
 });
