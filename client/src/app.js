@@ -4,6 +4,7 @@ let userMarker;
 let selectedLocation;
 let recordedBlob = null;
 let mediaRecorder = null;
+let recordingMarkers = [];
 const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
 const STREET_STYLE_URL = 'mapbox://styles/mapbox/streets-v12';
 const SATELLITE_STYLE_URL = 'mapbox://styles/mapbox/satellite-streets-v12';
@@ -53,8 +54,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('Map initialized successfully');
         map.addControl(new mapboxgl.NavigationControl());
         
-        // Store markers globally so we can reload them
-        let recordingMarkers = [];
         
         // Load existing recordings when map loads
         map.on('load', () => {
