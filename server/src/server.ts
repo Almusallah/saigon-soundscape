@@ -12,37 +12,32 @@ dotenv.config();
 const app = express();
 
 // Database connection
-connectDB();
+try {
+  console.log('Attempting to connect to database...');
+  connectDB();
+  console.log('Database connection successful');
+} catch (error) {
+  console.error('Database connection failed:', error);
+}
 
-// CORS Configuration with detailed logging
-const corsOptions = {
-  origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
-    const allowedOrigins = [
-      'https://saigon-soundscape-officinegap.vercel.app',
-      'http://localhost:3000',
-      process.env.CORS_ORIGIN
-    ].filter(Boolean);
-    
-    console.log('Incoming request from origin:', origin);
-    console.log('Allowed origins:', allowedOrigins);
-
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`CORS blocked for origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
-  credentials: true,
-  optionsSuccessStatus: 200
-};
+// Simple CORS configuration - allow all origins for testing
+app.use(cors());
 
 // Middleware
-app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Detailed logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log('Headers:', req.headers);
+  next();
+});
+
+// Basic route to test if server is running
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'Server is running' });
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -50,23 +45,20 @@ app.get('/api/health', (req, res) => {
     status: 'OK', 
     message: 'API server is running',
     environment: process.env.NODE_ENV,
-    timestamp: new Date().toISOString(),
-    allowedOrigins: [
-      'https://saigon-soundscape-officinegap.vercel.app',
-      'http://localhost:3000',
-      process.env.CORS_ORIGIN
-    ].filter(Boolean)
+    timestamp: new Date().toISOString()
   });
-});
-
-// Logging middleware
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
 });
 
 // Routes
 app.use('/api', soundscapeRouter);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    error: err.message || 'Internal Server Error'
+  });
+});
 
 // Global error handler
 app.use(errorHandler);
@@ -74,7 +66,7 @@ app.use(errorHandler);
 // Server configuration
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
 
 // Graceful shutdown
