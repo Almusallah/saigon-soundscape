@@ -9,10 +9,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": [
-    "server/src/**/*"
-  ],
-  "exclude": [
-    "node_modules"
-  ]
+  "include": ["server/src/**/*"],
+  "exclude": ["node_modules"]
 }

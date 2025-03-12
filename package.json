@@ -2,11 +2,11 @@
   "name": "saigon-soundscape",
   "version": "1.0.0",
   "description": "A geospatial sound recording application",
-  "main": "server/src/server.ts",
+  "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
     "dev": "nodemon server/src/server.ts",
-    "build": "tsc --project server/tsconfig.json",
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": ["soundscape", "audio", "map", "geolocation"],
