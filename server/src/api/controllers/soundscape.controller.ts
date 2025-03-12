@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AudioMarker } from '../../core/database/models';
-import { BackblazeStorage } from '../../core/storage/providers/backblaze';
+import { any } from '../../core/storage/providers/backblaze';
 
 export class SoundscapeController {
   static async createRecording(req: Request, res: Response) {
@@ -13,7 +13,7 @@ export class SoundscapeController {
       }
       
       // Upload to Backblaze
-      const { url, key } = await BackblazeStorage.uploadAudio(req.file);
+      const { url, key } = await any.uploadAudio(req.file);
       
       const recording = await AudioMarker.create({
         location: {

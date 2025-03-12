@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Saigon Sound Archive</title>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+    <link rel="stylesheet" href="src/styles/main.css">
+</head>
+<body>
+    <header>
+        <h1>Saigon Sound Archive</h1>
+        <div id="map-controls">
+            <button id="street-view-btn" class="active">Street View</button>
+            <button id="satellite-view-btn">Satellite View</button>
+        </div>
+    </header>
+
+    <div id="map"></div>
+    
+    <div id="recording-panel" class="hidden">
+        <h3>Record a Sound</h3>
+        <div id="location-display">Select a location on the map</div>
+        
+        <div>
+            <button id="record-audio">Start Recording</button>
+            <button id="stop-record" disabled>Stop Recording</button>
+        </div>
+        
+        <audio id="audio-preview" controls style="display:none;"></audio>
+        
+        <form id="upload-form">
+            <textarea id="recording-description" placeholder="Describe the sound"></textarea>
+            <button type="submit">Upload Recording</button>
+        </form>
+    </div>
+
+    <footer>
+        <p>A Project developed by <strong>Officine Gặp</strong></p>
+    </footer>
+
+    <script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+    <script src="src/app.js"></script>
+</body>
+</html>

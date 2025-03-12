@@ -1,8 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "node",
   "builds": [
     {
       "src": "server/src/server.ts",
@@ -13,10 +10,6 @@
     {
       "src": "/api/(.*)",
       "dest": "server/src/server.ts"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "client/index.html"
     }
   ],
   "env": {

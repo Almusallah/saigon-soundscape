@@ -14,13 +14,13 @@ router.post(
 // Route for fetching recordings
 router.get(
   '/recordings',
-  SoundscapeController.getRecordings
+  SoundscapeController.any
 );
 
 // Route for getting a signed upload URL
 router.post(
   '/get-upload-url',
-  SoundscapeController.getSignedUploadUrl
+  SoundscapeController.any
 );
 
 export default router;
