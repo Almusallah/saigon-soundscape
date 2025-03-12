@@ -14,19 +14,23 @@ const app = express();
 // Database connection
 connectDB();
 
-// Enhanced CORS Configuration
+// CORS Configuration with detailed logging
 const corsOptions = {
   origin: function (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
     const allowedOrigins = [
       'https://saigon-soundscape-officinegap.vercel.app',
       'http://localhost:3000',
       process.env.CORS_ORIGIN
-    ].filter(Boolean); // Remove any undefined values
+    ].filter(Boolean);
+    
+    console.log('Incoming request from origin:', origin);
+    console.log('Allowed origins:', allowedOrigins);
 
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('CORS not allowed for this origin'));
+      console.warn(`CORS blocked for origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -40,7 +44,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health Check Endpoint
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
@@ -49,9 +53,16 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     allowedOrigins: [
       'https://saigon-soundscape-officinegap.vercel.app',
-      'http://localhost:3000'
-    ]
+      'http://localhost:3000',
+      process.env.CORS_ORIGIN
+    ].filter(Boolean)
   });
+});
+
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
 });
 
 // Routes

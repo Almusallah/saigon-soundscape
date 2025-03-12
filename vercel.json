@@ -2,19 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "server/src/server.ts",
-      "use": "@vercel/node"
+      "src": "client/index.html",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "server/src/server.ts"
+      "src": "/(.*)",
+      "dest": "client/index.html"
     }
-  ],
-  "env": {
-    "CORS_ORIGIN": "https://saigon-soundscape-officinegap.vercel.app",
-    "NODE_ENV": "production",
-    "MONGODB_URI": "mongodb+srv://frassiyuri:Nordica6@saigon-soundscape.u0nfyvb.mongodb.net/?retryWrites=true&w=majority&appName=saigon-soundscape"
-  }
+  ]
 }

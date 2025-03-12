@@ -8,6 +8,8 @@ const SATELLITE_STYLE_URL = 'mapbox://styles/mapbox/satellite-streets-v12';
 const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM fully loaded, initializing Saigon Sound Archive');
+
     // Robust element selection with error handling
     const getElement = (selector) => {
         const element = document.querySelector(selector);
@@ -25,6 +27,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = getElement('#audio-file');
     const uploadPanel = getElement('#recording-panel');
     const audioPreview = getElement('#audio-preview');
+
+    // Detailed logging for element selection
+    console.log('Elements selected:', {
+        uploadForm: !!uploadForm,
+        fileInput: !!fileInput,
+        locationDisplay: !!locationDisplay,
+        uploadPanel: !!uploadPanel,
+        audioPreview: !!audioPreview
+    });
 
     // Check if all required elements exist
     if (!uploadForm || !fileInput || !locationDisplay || !uploadPanel || !audioPreview) {
@@ -124,11 +135,21 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('lat', selectedLocation.lat);
         formData.append('lng', selectedLocation.lng);
 
+        console.log('Attempting to upload with following data:', {
+            fileSize: audioFile.size,
+            fileType: audioFile.type,
+            description: description,
+            location: selectedLocation
+        });
+
         try {
+            console.log(`Sending request to: ${API_URL}/recordings`);
             const response = await fetch(`${API_URL}/recordings`, {
                 method: 'POST',
                 body: formData
             });
+
+            console.log('Response status:', response.status);
 
             if (response.ok) {
                 alert('Audio uploaded successfully!');
@@ -136,12 +157,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 uploadPanel.classList.add('hidden');
                 audioPreview.style.display = 'none';
             } else {
-                const errorData = await response.json();
-                alert(`Upload failed: ${errorData.message || 'Unknown error'}`);
+                try {
+                    const errorData = await response.json();
+                    console.error('Server error response:', errorData);
+                    alert(`Upload failed: ${errorData.message || 'Unknown error'}`);
+                } catch (parseError) {
+                    console.error('Could not parse error response', parseError);
+                    alert('Upload failed with an unreadable error');
+                }
             }
         } catch (error) {
             console.error('Upload error:', error);
-            alert('Failed to upload audio. Please try again.');
+            alert('Failed to upload audio. Please check your network connection.');
         }
     });
 });
