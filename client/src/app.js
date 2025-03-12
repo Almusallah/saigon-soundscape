@@ -102,42 +102,81 @@ document.addEventListener('DOMContentLoaded', () => {
     recordAudioBtn.addEventListener('click', startRecording);
     stopRecordBtn.addEventListener('click', stopRecording);
 
-    // Function to start recording
-    async function startRecording() {
-        try {
-            // Check if browser supports getUserMedia
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Your browser does not support audio recording');
-                return;
-            }
-            
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            const audioChunks = [];
-            
-            mediaRecorder.addEventListener('dataavailable', event => {
-                audioChunks.push(event.data);
-            });
-            
-            mediaRecorder.addEventListener('stop', () => {
-                recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                const audioURL = URL.createObjectURL(recordedBlob);
-                audioPreview.src = audioURL;
-                audioPreview.style.display = 'block';
-                
-                // Stop tracks to release the microphone
-                stream.getTracks().forEach(track => track.stop());
-            });
-            
-            // Start recording
-            mediaRecorder.start();
-            recordAudioBtn.disabled = true;
-            stopRecordBtn.disabled = false;
-        } catch (error) {
-            console.error('Error starting recording:', error);
-            alert('Failed to start recording: ' + error.message);
+   // Function to start recording with better mobile support
+async function startRecording() {
+    try {
+        // Check if browser supports getUserMedia
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Your browser does not support audio recording');
+            return;
         }
+        
+        console.log('Requesting audio access...');
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            } 
+        });
+        console.log('Audio access granted');
+        
+        // Try different audio formats for better compatibility
+        const options = {
+            mimeType: 'audio/webm;codecs=opus'
+        };
+        
+        // Check if the browser supports this format
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            console.log('audio/webm;codecs=opus not supported, trying audio/webm');
+            options.mimeType = 'audio/webm';
+            
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                console.log('audio/webm not supported, trying audio/mp4');
+                options.mimeType = 'audio/mp4';
+                
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    console.log('audio/mp4 not supported, using default format');
+                    delete options.mimeType;
+                }
+            }
+        }
+        
+        console.log('Using MIME type:', options.mimeType || 'default');
+        mediaRecorder = new MediaRecorder(stream, options);
+        const audioChunks = [];
+        
+        mediaRecorder.addEventListener('dataavailable', event => {
+            console.log('Data available event, data size:', event.data.size);
+            audioChunks.push(event.data);
+        });
+        
+        mediaRecorder.addEventListener('stop', () => {
+            console.log('Recording stopped, chunks:', audioChunks.length);
+            recordedBlob = new Blob(audioChunks, { 
+                type: options.mimeType || 'audio/webm' 
+            });
+            console.log('Created blob, size:', recordedBlob.size);
+            const audioURL = URL.createObjectURL(recordedBlob);
+            audioPreview.src = audioURL;
+            audioPreview.style.display = 'block';
+            
+            // Stop tracks to release the microphone
+            stream.getTracks().forEach(track => track.stop());
+        });
+        
+        // Start recording
+        mediaRecorder.start();
+        console.log('Recording started');
+        recordAudioBtn.disabled = true;
+        stopRecordBtn.disabled = false;
+    } catch (error) {
+        console.error('Error starting recording:', error);
+        alert('Failed to start recording: ' + error.message);
     }
+} 
+            
+           
     
     // Function to stop recording
     function stopRecording() {
@@ -197,53 +236,66 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Handle recording upload
-    uploadForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
+   // Handle recording upload
+uploadForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!selectedLocation) {
+        alert('Please select a location on the map');
+        return;
+    }
+    
+    if (!recordedBlob) {
+        alert('Please record a sound first');
+        return;
+    }
+
+    const description = document.getElementById('recording-description').value;
+
+    // Create form data
+    const formData = new FormData();
+    formData.append('audio', recordedBlob, 'recording.webm');
+    formData.append('description', description);
+    formData.append('lat', selectedLocation.lat);
+    formData.append('lng', selectedLocation.lng);
+
+    try {
+        console.log('Attempting to upload to:', `${API_URL}/recordings`);
+        const response = await fetch(`${API_URL}/recordings`, {
+            method: 'POST',
+            body: formData,
+            // Add these headers to help with CORS issues
+            headers: {
+                'Accept': 'application/json',
+            },
+            // Include credentials if your API uses cookies/sessions
+            credentials: 'include',
+        });
+
+        console.log('Upload response status:', response.status);
         
-        if (!selectedLocation) {
-            alert('Please select a location on the map');
-            return;
+        if (response.ok) {
+            // Reload recordings to show the new marker
+            loadRecordings();
+            
+            // Reset form and hide panel
+            uploadForm.reset();
+            recordingPanel.classList.add('hidden');
+            audioPreview.src = '';
+            audioPreview.style.display = 'none';
+            recordedBlob = null;
+            
+            alert('Recording uploaded successfully!');
+        } else {
+            const errorText = await response.text();
+            console.error('Server response:', errorText);
+            throw new Error(`Upload failed: ${response.status} - ${errorText}`);
         }
-        
-        if (!recordedBlob) {
-            alert('Please record a sound first');
-            return;
-        }
-
-        const description = document.getElementById('recording-description').value;
-
-        // Create form data
-        const formData = new FormData();
-        formData.append('audio', recordedBlob, 'recording.webm');
-        formData.append('description', description);
-        formData.append('lat', selectedLocation.lat);
-        formData.append('lng', selectedLocation.lng);
-
-        try {
-            const response = await fetch(`${API_URL}/recordings`, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (response.ok) {
-                // Reload recordings to show the new marker
-                loadRecordings();
-                
-                // Reset form and hide panel
-                uploadForm.reset();
-                recordingPanel.classList.add('hidden');
-                audioPreview.src = '';
-                audioPreview.style.display = 'none';
-                recordedBlob = null;
-                
-                alert('Recording uploaded successfully!');
-            } else {
-                throw new Error('Upload failed: ' + response.status);
-            }
-        } catch (error) {
-            console.error('Upload error:', error);
-            alert('Failed to upload recording: ' + error.message);
-        }
-    });
+    } catch (error) {
+        console.error('Upload error details:', error);
+        alert(`Failed to upload recording: ${error.message}`);
+    }
 });
+     
+    
+            
