@@ -56,6 +56,107 @@ const upload = multer({
   }
 });
 
+// Backblaze integration
+let b2;
+let useLocalStorage = true; // Default to local storage
+let setupComplete = false;
+
+try {
+  // Check if we have the module and credentials
+  if (process.env.B2_APPLICATION_KEY_ID && process.env.B2_APPLICATION_KEY) {
+    const B2 = require('backblaze-b2');
+    
+    b2 = new B2({
+      applicationKeyId: process.env.B2_APPLICATION_KEY_ID,
+      applicationKey: process.env.B2_APPLICATION_KEY
+    });
+    
+    console.log('Backblaze B2 module loaded successfully, will attempt authorization');
+    
+    // We'll attempt to use Backblaze
+    useLocalStorage = false;
+  } else {
+    console.log('Backblaze credentials not found, using local storage');
+  }
+} catch (moduleError) {
+  console.error('Backblaze B2 module not available:', moduleError);
+}
+
+// Initialize Backblaze if available
+async function setupB2() {
+  if (useLocalStorage || setupComplete) return;
+  
+  try {
+    await b2.authorize();
+    console.log('Backblaze B2 authorized successfully');
+    setupComplete = true;
+  } catch (error) {
+    console.error('Backblaze B2 authorization error:', error);
+    console.log('Falling back to local storage');
+    useLocalStorage = true;
+    setupComplete = true;
+  }
+}
+
+// Upload file to storage (either Backblaze B2 or local)
+async function uploadFile(filePath, fileName, mimeType) {
+  // Make sure setup is complete
+  if (!setupComplete) {
+    await setupB2();
+  }
+  
+  if (useLocalStorage) {
+    // Local storage
+    const destPath = path.join(uploadsDir, path.basename(filePath));
+    fs.copyFileSync(filePath, destPath);
+    
+    // Create public URL
+    const baseUrl = process.env.BASE_URL || 'https://saigon-soundscape-production.up.railway.app';
+    return {
+      fileName: path.basename(filePath),
+      contentType: mimeType,
+      url: `${baseUrl}/api/uploads/${path.basename(filePath)}`
+    };
+  } else {
+    try {
+      // Upload to Backblaze B2
+      const bucketId = process.env.B2_BUCKET_ID || 'ef791392b1a1865094580d1b';
+      const bucketName = process.env.B2_BUCKET_NAME || 'saigon-soundscape-audio';
+      
+      const { data: { uploadUrl, authorizationToken } } = await b2.getUploadUrl({
+        bucketId: bucketId
+      });
+
+      // Read file
+      const fileBuffer = fs.readFileSync(filePath);
+      
+      // Upload file
+      const { data } = await b2.uploadFile({
+        uploadUrl: uploadUrl,
+        uploadAuthToken: authorizationToken,
+        fileName: fileName,
+        data: fileBuffer,
+        contentType: mimeType
+      });
+
+      // Return file info
+      return {
+        fileId: data.fileId,
+        fileName: data.fileName,
+        contentType: mimeType,
+        bucketId: bucketId,
+        url: `https://f004.backblazeb2.com/file/${bucketName}/${fileName}`
+      };
+    } catch (error) {
+      console.error('Backblaze upload error:', error);
+      
+      // Fall back to local storage on error
+      useLocalStorage = true;
+      return await uploadFile(filePath, fileName, mimeType);
+    }
+  }
+}
+
 // In-memory storage for recordings
 let recordings = [];
 
@@ -69,7 +170,8 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'Saigon Soundscape API is running',
-    endpoints: ['/api/health', '/api/recordings', '/api/uploads/:filename']
+    endpoints: ['/api/health', '/api/recordings', '/api/uploads/:filename'],
+    storageType: useLocalStorage ? 'local' : 'Backblaze B2'
   });
 });
 
@@ -79,8 +181,13 @@ app.get('/api/health', (req, res) => {
     status: 'OK',
     message: 'API server is running',
     timestamp: new Date().toISOString(),
+    storageType: useLocalStorage ? 'local' : 'Backblaze B2',
     recordingsCount: recordings.length,
     environment: {
+      hasB2KeyId: !!process.env.B2_APPLICATION_KEY_ID,
+      hasB2AppKey: !!process.env.B2_APPLICATION_KEY,
+      hasB2BucketId: !!process.env.B2_BUCKET_ID,
+      hasB2BucketName: !!process.env.B2_BUCKET_NAME,
       nodeEnv: process.env.NODE_ENV || 'development'
     },
     cors: {
@@ -115,9 +222,15 @@ app.post('/api/recordings', (req, res) => {
         mimetype: req.file.mimetype
       });
       
-      // Move file from temp to uploads directory
-      const uploadedFile = path.join(uploadsDir, req.file.filename);
-      fs.copyFileSync(req.file.path, uploadedFile);
+      // Generate a unique filename for storage
+      const storageFileName = `recordings/${uuidv4()}${path.extname(req.file.originalname)}`;
+      
+      // Upload to storage (Backblaze or local)
+      const uploadResult = await uploadFile(
+        req.file.path,
+        storageFileName,
+        req.file.mimetype
+      );
       
       // Clean up temp file
       try {
@@ -126,19 +239,15 @@ app.post('/api/recordings', (req, res) => {
         console.error('Failed to delete temp file:', e);
       }
       
-      // Create public URL
-      const baseUrl = process.env.BASE_URL || 'https://saigon-soundscape-production.up.railway.app';
-      const fileUrl = `${baseUrl}/api/uploads/${req.file.filename}`;
-      
       // Create recording entry
       const newRecording = {
         id: uuidv4(),
-        fileName: req.file.filename,
+        fileName: uploadResult.fileName,
         originalName: req.file.originalname,
         mimeType: req.file.mimetype,
         size: req.file.size,
         description: req.body.description || '',
-        fileUrl: fileUrl,
+        fileUrl: uploadResult.url,
         location: {
           lat: parseFloat(req.body.lat || 0),
           lng: parseFloat(req.body.lng || 0)
@@ -177,7 +286,7 @@ app.get('/api/recordings', (req, res) => {
   });
 });
 
-// Serve uploaded files
+// Serve uploaded files (for local storage)
 app.get('/api/uploads/:filename', (req, res) => {
   const filePath = path.join(uploadsDir, req.params.filename);
   console.log(`Attempting to serve file: ${filePath}`);
@@ -206,8 +315,8 @@ app.get('/api/uploads/:filename', (req, res) => {
   }
 });
 
-// Add some sample recordings for testing
-const addSampleRecordings = () => {
+// Add a sample recording for testing
+const addSampleRecording = () => {
   if (recordings.length === 0) {
     recordings.push({
       id: 'sample-1',
@@ -240,5 +349,14 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
-  addSampleRecordings();
+  
+  // Initialize Backblaze in the background
+  if (!useLocalStorage && !setupComplete) {
+    setupB2().catch(error => {
+      console.error('Failed to set up Backblaze:', error);
+    });
+  }
+  
+  // Add sample recording
+  addSampleRecording();
 });
