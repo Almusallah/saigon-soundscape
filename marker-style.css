@@ -1,0 +1,19 @@
+.marker-pin {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: #FF5722;
+    border: 2px solid white;
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+}
+
+.map-error {
+    padding: 20px;
+    text-align: center;
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin: 20px;
+}
