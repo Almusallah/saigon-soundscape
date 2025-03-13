@@ -21,6 +21,42 @@
             padding: 15px;
             text-align: center;
         }
+        footer a {
+            color: white;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+        .content-wrapper {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+        .upload-button {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         .storage-indicator.active {
             background-color: #4CAF50;
             color: white;
@@ -33,7 +69,6 @@
             padding: 2px 5px;
             border-radius: 3px;
         }
-        /* Rest of your styles */
     </style>
     <script>
         // API endpoint configuration
@@ -41,6 +76,8 @@
 
         // Function to update storage info in the footer
         function updateStorageInfo() {
+            console.log('Fetching storage info from:', `${API_URL}/health`);
+            
             fetch(`${API_URL}/health`)
                 .then(response => {
                     if (!response.ok) {
@@ -49,10 +86,12 @@
                     return response.json();
                 })
                 .then(data => {
+                    console.log('Health API response:', data);
+                    
                     // Update footer with storage info
                     const footer = document.querySelector('footer p');
                     
-                    // Check if data and data.storage exist
+                    // Check if data has storage field
                     if (data && data.storage) {
                         const storageClass = data.storage.storageClass || 'Unknown';
                         const storageWorking = data.storage.working ? 'Active' : 'Inactive';
@@ -65,7 +104,6 @@
                             footer.innerHTML += ` | Space: ${availableSpace}`;
                         }
                     } else {
-                        // Fallback if data.storage doesn't exist
                         console.error('Storage information not available in API response');
                         footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
                                           Storage: <span class="storage-indicator inactive">Unavailable</span>`;
@@ -73,7 +111,6 @@
                 })
                 .catch(error => {
                     console.error('Error fetching storage info:', error);
-                    // Update footer with error state
                     const footer = document.querySelector('footer p');
                     footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
                                       Storage: <span class="storage-indicator inactive">Error</span>`;
@@ -94,7 +131,30 @@
     <div class="upload-form" id="upload-form">
         <h2>Upload Audio Recording</h2>
         <form id="audio-form">
-            <!-- Form content -->
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" id="title" name="title" required>
+            </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="audio-file">Audio File</label>
+                <input type="file" id="audio-file" name="audioFile" accept="audio/*" required>
+            </div>
+            <div class="form-group">
+                <label for="latitude">Latitude</label>
+                <input type="text" id="latitude" name="latitude" readonly>
+            </div>
+            <div class="form-group">
+                <label for="longitude">Longitude</label>
+                <input type="text" id="longitude" name="longitude" readonly>
+            </div>
+            <div class="form-actions">
+                <button type="button" id="cancel-button">Cancel</button>
+                <button type="submit" id="submit-button">Upload</button>
+            </div>
         </form>
     </div>
     <footer>
@@ -102,7 +162,7 @@
     </footer>
 
     <script>
-        // Mapbox token - UPDATED WITH YOUR NEW TOKEN FROM DASHBOARD
+        // Mapbox token
         mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
 
         // Initialize map
@@ -113,10 +173,20 @@
             zoom: 12
         });
 
-        // Map initialization code...
+        // Add navigation controls
+        map.addControl(new mapboxgl.NavigationControl());
 
-        // IMPORTANT: Initialize the updateStorageInfo function when DOM is loaded
+        // Add geolocation control
+        map.addControl(new mapboxgl.GeolocateControl({
+            positionOptions: {
+                enableHighAccuracy: true
+            },
+            trackUserLocation: true
+        }));
+
+        // Initialize when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, updating storage info');
             // Update storage info in footer
             updateStorageInfo();
             // Update every 5 minutes
