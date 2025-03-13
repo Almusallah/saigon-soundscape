@@ -40,11 +40,42 @@ app.get('/', (req, res) => {
 });
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+app.get('/api/health', async (req, res) => {
+  let b2Status = {
+    working: false,
+    availableSpace: 'Unknown',
+    storageClass: 'Backblaze B2'
+  };
+  
+  // Check Backblaze B2 status
+  try {
+    // Assuming BackblazeStorage is available globally or can be imported
+    const BackblazeStorage = require('./core/storage/providers/backblaze').BackblazeStorage;
+    
+    // Check if B2 is initialized and working
+    if (BackblazeStorage && BackblazeStorage.b2Client) {
+      b2Status.working = true;
+      
+      // Get additional info if possible
+      try {
+        const storageInfo = await BackblazeStorage.getStorageUsage();
+        if (storageInfo) {
+          b2Status.availableSpace = storageInfo.availableSpace || 'Unlimited';
+        }
+      } catch (error) {
+        console.error('Error getting storage info:', error);
+      }
+    }
+  } catch (error) {
+    console.error('Error checking B2 status:', error);
+    b2Status.error = error.message;
+  }
+  
+  res.json({
+    status: 'OK',
     message: 'API server is running',
     environment: process.env.NODE_ENV,
+    storage: b2Status,
     timestamp: new Date().toISOString()
   });
 });
