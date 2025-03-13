@@ -373,15 +373,14 @@
 
         // Function to update storage info in the footer
         // Function to update storage info in the footer
-        function updateStorageInfo() {
-            // Mock storage data for development
-            const footer = document.querySelector("footer p");
-            
-            if (footer) {
-                footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                 Storage: <span class="storage-indicator active">Local Storage (Active)</span>`;
-            }
-        }
+// Function to update storage info in the footer
+function updateStorageInfo() {
+    const footer = document.querySelector('footer p');
+    if (footer) {
+        footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                           Storage: <span class="storage-indicator active">Local Storage (Active)</span>`;
+    }
+}
             console.log('Fetching storage info');
             
             fetchWithFallback(API_ENDPOINTS.health)
@@ -466,31 +465,49 @@
                 );
                 
                 // Setup map click for coordinates
-                map.on('click', function(e) {
-                    console.log('Map clicked at:', e.lngLat);
-                    
-                    // Set coordinates for the forms
-                    document.getElementById('latitude').value = e.lngLat.lat.toFixed(6);
-                    document.getElementById('longitude').value = e.lngLat.lng.toFixed(6);
-                    
-                    if (document.getElementById('record-latitude')) {
-                        document.getElementById('record-latitude').value = e.lngLat.lat.toFixed(6);
-                    }
-                    
-                    if (document.getElementById('record-longitude')) {
-                        document.getElementById('record-longitude').value = e.lngLat.lng.toFixed(6);
-                    }
-                    
-                    // Store the location
-                    selectedLocation = {
-                        lat: e.lngLat.lat,
-                        lng: e.lngLat.lng
-                    };
-                    
-                    // Open the form
-                    openUploadForm();
-                });                });
-                
+// Map click event handler
+map.on('click', function(e) {
+    console.log('Map clicked at:', e.lngLat);
+    
+    // Update form coordinates
+    const latitudeInput = document.getElementById('latitude');
+    const longitudeInput = document.getElementById('longitude');
+    const recordLatitudeInput = document.getElementById('record-latitude');
+    const recordLongitudeInput = document.getElementById('record-longitude');
+    
+    if (latitudeInput) latitudeInput.value = e.lngLat.lat.toFixed(6);
+    if (longitudeInput) longitudeInput.value = e.lngLat.lng.toFixed(6);
+    if (recordLatitudeInput) recordLatitudeInput.value = e.lngLat.lat.toFixed(6);
+    if (recordLongitudeInput) recordLongitudeInput.value = e.lngLat.lng.toFixed(6);
+    
+    // Store the selected location
+    selectedLocation = {
+        lat: e.lngLat.lat,
+        lng: e.lngLat.lng
+    };
+    
+    // Create a temporary marker
+    if (typeof tempMarker !== 'undefined' && tempMarker) {
+        tempMarker.remove();
+    }
+    
+    // Create marker element
+    const markerElement = document.createElement('div');
+    markerElement.className = 'marker-pin';
+    markerElement.style.width = '20px';
+    markerElement.style.height = '20px';
+    markerElement.style.backgroundColor = '#FF5722';
+    markerElement.style.borderRadius = '50%';
+    markerElement.style.border = '2px solid white';
+    
+    // Add marker to map
+    tempMarker = new mapboxgl.Marker(markerElement)
+        .setLngLat(e.lngLat)
+        .addTo(map);
+    
+    // Open the form
+    openUploadForm();
+});
                 // Load existing recordings when map is ready
                 map.on('load', function() {
                     console.log('Map loaded successfully');
@@ -567,10 +584,35 @@
         }
         
         // Function to open upload form
-        function openUploadForm() {
-            document.getElementById('form-overlay').style.display = 'flex';
-        }
-        
+// Function to open upload form
+function openUploadForm() {
+    const formOverlay = document.getElementById('form-overlay');
+    if (formOverlay) {
+        formOverlay.style.display = 'flex';
+    } else {
+        console.error('Form overlay element not found!');
+    }
+}
+
+// Function to close upload form
+function closeUploadForm() {
+    const formOverlay = document.getElementById('form-overlay');
+    if (formOverlay) {
+        formOverlay.style.display = 'none';
+    }
+    
+    // Remove temporary marker if it exists
+    if (typeof tempMarker !== 'undefined' && tempMarker) {
+        tempMarker.remove();
+        tempMarker = null;
+    }
+    
+    // Reset any form data
+    const audioForm = document.getElementById('audio-form');
+    if (audioForm) {
+        audioForm.reset();
+    }
+}
         // Function to close upload form
         function closeUploadForm() {
             document.getElementById('form-overlay').style.display = 'none';
