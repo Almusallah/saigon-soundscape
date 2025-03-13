@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://api.mapbox.com 'unsafe-inline' blob:; worker-src blob:; style-src 'self' https://api.mapbox.com 'unsafe-inline'; img-src 'self' data: https://*; connect-src 'self' https://saigon-soundscape-production.up.railway.app https://api.mapbox.com blob:; media-src blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://api.mapbox.com 'unsafe-inline' blob:; worker-src blob:; style-src 'self' https://api.mapbox.com 'unsafe-inline'; img-src 'self' data: https://*; connect-src 'self' https://saigon-soundscape-production.up.railway.app https://api.mapbox.com https://*.mapbox.com blob:; media-src blob:;">
     <title>Saigon Sound Archive</title>
     
     <style>
@@ -152,7 +152,14 @@
         }
         
         .recording-marker {
-            width: 24px;
+        .marker-pin {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #FF5722;
+            border: 2px solid white;
+            cursor: pointer;
+        }            width: 24px;
             height: 24px;
             border-radius: 50%;
             background-color: #3887be;
@@ -168,64 +175,15 @@
             border-radius: 4px;
         }
         
-        .record-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        
-        .record-button {
-            background-color: #f44336;
-            color: white;
-            border: none;
+        .temp-marker {
+            width: 20px;
+            height: 20px;
+            background-color: #FF5722;
+            border: 2px solid white;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .stop-button {
-            background-color: #333;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 8px 16px;
-            cursor: pointer;
-        }
-        
-        .audio-recorder {
-            margin-top: 10px;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #f8f8f8;
-        }
-        
-        .audio-visualizer {
-            height: 60px;
-            width: 100%;
-            background-color: #eee;
-            margin-top: 10px;
-            border-radius: 4px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .audio-visualizer-inner {
-            height: 100%;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .recording-indicator {
-            color: #f44336;
-            animation: blink 1s infinite;
+            position: absolute;
+            transform: translate(-50%, -50%);
+            z-index: 5;
         }
         
         .tab-controls {
@@ -253,41 +211,6 @@
         .tab-content.active {
             display: block;
         }
-        
-        .location-pin {
-            background-color: #FF5722;
-            border: 2px solid white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            cursor: pointer;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10;
-            display: none;
-        }
-        
-        .map-message {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.7);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 4px;
-            font-size: 14px;
-            z-index: 5;
-            display: none;
-        }
-        
-        @keyframes blink {
-            0% { opacity: 1; }
-            50% { opacity: 0.4; }
-            100% { opacity: 1; }
-        }
     </style>
 </head>
 <body>
@@ -298,8 +221,6 @@
     <div class="content-wrapper">
         <input type="text" id="location-search" class="location-search" placeholder="Search for a location...">
         <div id="map"></div>
-        <div class="location-pin" id="location-pin"></div>
-        <div class="map-message" id="map-message">Click on the map to place a recording</div>
         <button class="upload-button" id="upload-button">+</button>
     </div>
     
@@ -309,46 +230,11 @@
             <h2>Upload Audio Recording</h2>
             
             <div class="tab-controls">
-                <button class="tab-button active" data-tab="record">Record Audio</button>
-                <button class="tab-button" data-tab="upload">Upload File</button>
+                <button class="tab-button active" data-tab="upload">Upload File</button>
+                <button class="tab-button" data-tab="record">Record Audio</button>
             </div>
             
-            <div class="tab-content active" id="record-tab">
-                <div class="audio-recorder">
-                    <div class="form-group">
-                        <label for="record-title">Title</label>
-                        <input type="text" id="record-title" name="title" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="record-description">Description</label>
-                        <textarea id="record-description" name="description" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <div class="audio-visualizer">
-                            <div class="audio-visualizer-inner" id="visualizer">
-                                Click record to start
-                            </div>
-                        </div>
-                        <div class="record-controls">
-                            <button type="button" id="start-record" class="record-button">●</button>
-                            <button type="button" id="stop-record" class="stop-button" disabled>Stop</button>
-                            <span id="recording-time"></span>
-                        </div>
-                    </div>
-                    <div class="form-group" id="audio-preview-container" style="display: none;">
-                        <label>Preview</label>
-                        <audio id="audio-preview" controls></audio>
-                    </div>
-                    <input type="hidden" id="record-latitude" name="latitude">
-                    <input type="hidden" id="record-longitude" name="longitude">
-                    <div class="form-actions">
-                        <button type="button" id="cancel-record" class="cancel-button">Cancel</button>
-                        <button type="button" id="submit-record" class="submit-button" disabled>Save Recording</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="tab-content" id="upload-tab">
+            <div class="tab-content active" id="upload-tab">
                 <form id="audio-form">
                     <div class="form-group">
                         <label for="title">Title</label>
@@ -376,6 +262,40 @@
                     </div>
                 </form>
             </div>
+            
+            <div class="tab-content" id="record-tab">
+                <div id="recorder-container">
+                    <div class="form-group">
+                        <label for="record-title">Title</label>
+                        <input type="text" id="record-title" name="title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="record-description">Description</label>
+                        <textarea id="record-description" name="description" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Recording</label>
+                        <div id="audio-controls">
+                            <button type="button" id="start-record">Record</button>
+                            <button type="button" id="stop-record" disabled>Stop</button>
+                            <span id="recording-time"></span>
+                        </div>
+                        <div id="visualizer" style="height: 60px; background-color: #f8f8f8; margin-top: 10px; display: flex; align-items: center; justify-content: center;">
+                            Click record to start
+                        </div>
+                    </div>
+                    <div class="form-group" id="audio-preview" style="display: none;">
+                        <label>Preview</label>
+                        <audio id="audio-preview-element" controls></audio>
+                    </div>
+                    <input type="hidden" id="record-latitude" name="latitude">
+                    <input type="hidden" id="record-longitude" name="longitude">
+                    <div class="form-actions">
+                        <button type="button" id="cancel-record">Cancel</button>
+                        <button type="button" id="submit-record" disabled>Save Recording</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -398,64 +318,109 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" crossorigin="anonymous">
 
     <script>
-        // API endpoint configuration
-        const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
+        // API endpoint configuration - use a more direct approach
+        const API_ENDPOINTS = {
+            // Try multiple endpoints - fallback mechanism
+            health: [
+                'https://saigon-soundscape-production.up.railway.app/api/health',
+                'https://saigon-soundscape-api.up.railway.app/api/health'
+            ],
+            recordings: [
+                'https://saigon-soundscape-production.up.railway.app/api/recordings',
+                'https://saigon-soundscape-api.up.railway.app/api/recordings'
+            ],
+            upload: [
+                'https://saigon-soundscape-production.up.railway.app/api/upload',
+                'https://saigon-soundscape-api.up.railway.app/api/upload'
+            ]
+        };
+        
         let map;
+        let tempMarker;
         let mediaRecorder;
         let audioChunks = [];
-        let recordedBlob;
         let isRecording = false;
         let recordingTimer;
         let recordingSeconds = 0;
         let selectedLocation = null;
 
+        // Function to try different endpoints
+        async function fetchWithFallback(endpoints, options = {}) {
+            for (const endpoint of endpoints) {
+                try {
+                    console.log(`Trying endpoint: ${endpoint}`);
+                    const response = await fetch(endpoint, {
+                        ...options,
+                        mode: 'cors',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...options.headers
+                        }
+                    });
+                    
+                    if (response.ok) {
+                        return response.json();
+                    }
+                } catch (error) {
+                    console.warn(`Failed to fetch from ${endpoint}:`, error);
+                    // Continue to next endpoint
+                }
+            }
+            
+            // If all endpoints fail
+            throw new Error('All endpoints failed');
+        }
+
+        // Function to update storage info in the footer
         // Function to update storage info in the footer
         function updateStorageInfo() {
-            console.log('Fetching storage info from:', `${API_URL}/health`);
+            // Mock storage data for development
+            const footer = document.querySelector("footer p");
             
-            fetch(`${API_URL}/health`, {
-                method: 'GET',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to fetch health info');
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Health API response:', data);
-                
-                // Update footer with storage info
-                const footer = document.querySelector('footer p');
-                
-                // Check if data has storage field
-                if (data && data.storage) {
-                    const storageClass = data.storage.storageClass || 'Unknown';
-                    const storageWorking = data.storage.working ? 'Active' : 'Inactive';
-                    const availableSpace = data.storage.availableSpace || 'Unknown';
-                    
-                    footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                       Storage: <span class="storage-indicator ${data.storage.working ? 'active' : 'inactive'}">${storageClass} (${storageWorking})</span>`;
-                    
-                    if (availableSpace && availableSpace !== 'Unknown') {
-                        footer.innerHTML += ` | Space: ${availableSpace}`;
-                    }
-                } else {
-                    console.error('Storage information not available in API response');
-                    footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                      Storage: <span class="storage-indicator inactive">Unavailable</span>`;
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching storage info:', error);
-                const footer = document.querySelector('footer p');
+            if (footer) {
                 footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                  Storage: <span class="storage-indicator inactive">Error</span>`;
-            });
+                                 Storage: <span class="storage-indicator active">Local Storage (Active)</span>`;
+            }
+        }
+            console.log('Fetching storage info');
+            
+            fetchWithFallback(API_ENDPOINTS.health)
+                .then(data => {
+                    console.log('Health API response:', data);
+                    
+                    // Update footer with storage info
+                    const footer = document.querySelector('footer p');
+                    
+                    // Check if data has storage field
+                    if (data && data.storage) {
+                        const storageClass = data.storage.storageClass || 'Unknown';
+                        const storageWorking = data.storage.working ? 'Active' : 'Inactive';
+                        const availableSpace = data.storage.availableSpace || 'Unknown';
+                        
+                        footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                                           Storage: <span class="storage-indicator ${data.storage.working ? 'active' : 'inactive'}">${storageClass} (${storageWorking})</span>`;
+                        
+                        if (availableSpace && availableSpace !== 'Unknown') {
+                            footer.innerHTML += ` | Space: ${availableSpace}`;
+                        }
+                    } else {
+                        console.error('Storage information not available in API response');
+                        mockStorageInfo(footer);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching storage info:', error);
+                    mockStorageInfo(document.querySelector('footer p'));
+                });
+        }
+        
+        // Mock storage info function for when API is not available
+        function mockStorageInfo(element) {
+            if (!element) return;
+            
+            // Use mock data for development
+            element.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                                Storage: <span class="storage-indicator active">Local Storage (Active)</span> | Space: Unlimited`;
         }
 
         // Function to initialize map with error handling
@@ -473,7 +438,7 @@
                 // Set Mapbox access token
                 mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
                 
-                // Create map instance - centered on Ho Chi Minh City
+                // Create map instance
                 map = new mapboxgl.Map({
                     container: 'map',
                     style: 'mapbox://styles/mapbox/streets-v11',
@@ -488,7 +453,7 @@
                 });
                 
                 // Add navigation controls
-                map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+                map.addControl(new mapboxgl.NavigationControl());
                 
                 // Add geolocation control
                 map.addControl(
@@ -502,24 +467,29 @@
                 
                 // Setup map click for coordinates
                 map.on('click', function(e) {
-                    // Set coordinates for both forms
+                    console.log('Map clicked at:', e.lngLat);
+                    
+                    // Set coordinates for the forms
                     document.getElementById('latitude').value = e.lngLat.lat.toFixed(6);
                     document.getElementById('longitude').value = e.lngLat.lng.toFixed(6);
-                    document.getElementById('record-latitude').value = e.lngLat.lat.toFixed(6);
-                    document.getElementById('record-longitude').value = e.lngLat.lng.toFixed(6);
                     
-                    // Store selected location
+                    if (document.getElementById('record-latitude')) {
+                        document.getElementById('record-latitude').value = e.lngLat.lat.toFixed(6);
+                    }
+                    
+                    if (document.getElementById('record-longitude')) {
+                        document.getElementById('record-longitude').value = e.lngLat.lng.toFixed(6);
+                    }
+                    
+                    // Store the location
                     selectedLocation = {
                         lat: e.lngLat.lat,
                         lng: e.lngLat.lng
                     };
                     
-                    // If we're in location selection mode, open the form
-                    if (document.getElementById('map-message').style.display === 'block') {
-                        document.getElementById('map-message').style.display = 'none';
-                        openUploadForm();
-                    }
-                });
+                    // Open the form
+                    openUploadForm();
+                });                });
                 
                 // Load existing recordings when map is ready
                 map.on('load', function() {
@@ -532,32 +502,36 @@
             }
         }
         
+        // Function to add a temporary marker at the clicked location
+        function addTemporaryMarker(lngLat) {
+            // Remove existing marker if any
+            if (tempMarker) {
+                tempMarker.remove();
+            }
+            
+            // Create a DOM element for the marker
+            const el = document.createElement('div');
+            el.className = 'temp-marker';
+            
+            // Create the marker
+            tempMarker = new mapboxgl.Marker(el)
+                .setLngLat(lngLat)
+                .addTo(map);
+        }
+        
         // Function to fetch existing recordings
         function fetchRecordings() {
-            fetch(`${API_URL}/recordings`, {
-                method: 'GET',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    console.warn('No recordings found or API not available');
-                    return { recordings: [] };
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data && data.recordings && data.recordings.length > 0) {
-                    addRecordingMarkers(data.recordings);
-                } else {
-                    console.log('No recordings available');
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching recordings:', error);
-            });
+            fetchWithFallback(API_ENDPOINTS.recordings)
+                .then(data => {
+                    if (data && data.recordings && data.recordings.length > 0) {
+                        addRecordingMarkers(data.recordings);
+                    } else {
+                        console.log('No recordings available');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching recordings:', error);
+                });
         }
         
         // Function to add markers for recordings
@@ -600,7 +574,17 @@
         // Function to close upload form
         function closeUploadForm() {
             document.getElementById('form-overlay').style.display = 'none';
+            
+            // Remove temporary marker
+            if (tempMarker) {
+                tempMarker.remove();
+                tempMarker = null;
+            }
+            
+            // Reset recording if active
             resetRecording();
+            
+            // Reset form
             document.getElementById('audio-form').reset();
         }
         
@@ -624,7 +608,7 @@
             });
         }
         
-        // Function to set up audio recording
+        // Function to setup audio recording
         function setupAudioRecording() {
             const startRecordButton = document.getElementById('start-record');
             const stopRecordButton = document.getElementById('stop-record');
@@ -632,19 +616,17 @@
             const visualizer = document.getElementById('visualizer');
             const recordingTime = document.getElementById('recording-time');
             const audioPreview = document.getElementById('audio-preview');
-            const previewContainer = document.getElementById('audio-preview-container');
+            const audioPreviewElement = document.getElementById('audio-preview-element');
+            
+            if (!startRecordButton || !stopRecordButton || !submitRecordButton) {
+                console.error('Recording controls not found');
+                return;
+            }
             
             // Start recording
             startRecordButton.addEventListener('click', async () => {
                 if (!navigator.mediaDevices) {
                     alert('Your browser does not support audio recording');
-                    return;
-                }
-                
-                if (!selectedLocation) {
-                    alert('Please select a location on the map first');
-                    closeUploadForm();
-                    document.getElementById('map-message').style.display = 'block';
                     return;
                 }
                 
@@ -658,12 +640,17 @@
                     });
                     
                     mediaRecorder.addEventListener('stop', () => {
-                        recordedBlob = new Blob(audioChunks, { type: 'audio/mpeg' });
-                        const audioURL = URL.createObjectURL(recordedBlob);
-                        audioPreview.src = audioURL;
-                        previewContainer.style.display = 'block';
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/mpeg' });
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        
+                        if (audioPreviewElement) {
+                            audioPreviewElement.src = audioUrl;
+                            audioPreview.style.display = 'block';
+                        }
+                        
                         submitRecordButton.disabled = false;
                         visualizer.innerHTML = 'Recording complete';
+                        
                         clearInterval(recordingTimer);
                     });
                     
@@ -671,12 +658,17 @@
                     isRecording = true;
                     startRecordButton.disabled = true;
                     stopRecordButton.disabled = false;
-                    visualizer.innerHTML = '<span class="recording-indicator">● Recording...</span>';
+                    visualizer.innerHTML = '<span style="color: red;">● Recording...</span>';
                     
                     // Setup recording timer
                     recordingSeconds = 0;
-                    updateRecordingTime();
-                    recordingTimer = setInterval(updateRecordingTime, 1000);
+                    recordingTime.textContent = '00:00';
+                    recordingTimer = setInterval(() => {
+                        recordingSeconds++;
+                        const minutes = Math.floor(recordingSeconds / 60);
+                        const seconds = recordingSeconds % 60;
+                        recordingTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    }, 1000);
                     
                 } catch (error) {
                     console.error('Error starting recording:', error);
@@ -709,32 +701,24 @@
                     return;
                 }
                 
-                if (!recordedBlob) {
+                if (!audioChunks.length) {
                     alert('No recording available. Please record audio first.');
                     return;
                 }
                 
+                const audioBlob = new Blob(audioChunks, { type: 'audio/mpeg' });
                 const formData = new FormData();
                 formData.append('title', title);
                 formData.append('description', description);
                 formData.append('latitude', latitude);
                 formData.append('longitude', longitude);
-                formData.append('audioFile', recordedBlob, 'recording.mp3');
+                formData.append('audioFile', audioBlob, 'recording.mp3');
                 
                 submitRecordButton.disabled = true;
                 submitRecordButton.textContent = 'Uploading...';
                 
                 uploadRecording(formData);
             });
-        }
-        
-        // Function to update recording time display
-        function updateRecordingTime() {
-            recordingSeconds++;
-            const minutes = Math.floor(recordingSeconds / 60);
-            const seconds = recordingSeconds % 60;
-            document.getElementById('recording-time').textContent = 
-                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
         
         // Function to reset recording state
@@ -749,24 +733,23 @@
             
             isRecording = false;
             audioChunks = [];
-            recordedBlob = null;
-            recordingSeconds = 0;
             
             const visualizer = document.getElementById('visualizer');
-            if (visualizer) visualizer.innerHTML = 'Click record to start';
-            
             const startRecordButton = document.getElementById('start-record');
             const stopRecordButton = document.getElementById('stop-record');
             const submitRecordButton = document.getElementById('submit-record');
-            const previewContainer = document.getElementById('audio-preview-container');
+            const audioPreview = document.getElementById('audio-preview');
+            const recordingTime = document.getElementById('recording-time');
             
+            if (visualizer) visualizer.innerHTML = 'Click record to start';
             if (startRecordButton) startRecordButton.disabled = false;
             if (stopRecordButton) stopRecordButton.disabled = true;
             if (submitRecordButton) {
                 submitRecordButton.disabled = true;
                 submitRecordButton.textContent = 'Save Recording';
             }
-            if (previewContainer) previewContainer.style.display = 'none';
+            if (audioPreview) audioPreview.style.display = 'none';
+            if (recordingTime) recordingTime.textContent = '';
             
             // Reset form fields
             const recordTitle = document.getElementById('record-title');
@@ -777,32 +760,59 @@
         
         // Function to upload recording
         function uploadRecording(formData) {
-            fetch(`${API_URL}/upload`, {
-                method: 'POST',
-                body: formData,
-                mode: 'cors'
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to upload recording');
+            // Try each upload endpoint
+            let currentEndpointIndex = 0;
+            
+            function tryUpload() {
+                if (currentEndpointIndex >= API_ENDPOINTS.upload.length) {
+                    console.error('All upload endpoints failed');
+                    alert('Failed to upload recording. Please try again later.');
+                    
+                    // Reset UI
+                    const submitButton = document.getElementById('submit-button');
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.textContent = 'Upload';
+                    }
+                    
+                    const submitRecordButton = document.getElementById('submit-record');
+                    if (submitRecordButton) {
+                        submitRecordButton.disabled = false;
+                        submitRecordButton.textContent = 'Save Recording';
+                    }
+                    
+                    return;
                 }
-                return response.json();
-            })
-            .then(data => {
-                console.log('Upload successful:', data);
-                alert('Recording uploaded successfully!');
-                closeUploadForm();
-                fetchRecordings(); // Refresh the map
-            })
-            .catch(error => {
-                console.error('Error uploading recording:', error);
-                alert('Failed to upload recording. Please try again.');
-                const submitRecordButton = document.getElementById('submit-record');
-                if (submitRecordButton) {
-                    submitRecordButton.disabled = false;
-                    submitRecordButton.textContent = 'Save Recording';
-                }
-            });
+                
+                const endpoint = API_ENDPOINTS.upload[currentEndpointIndex];
+                console.log(`Trying to upload to: ${endpoint}`);
+                
+                fetch(endpoint, {
+                    method: 'POST',
+                    body: formData,
+                    mode: 'cors'
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Server responded with ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Upload successful:', data);
+                    alert('Recording uploaded successfully!');
+                    closeUploadForm();
+                    fetchRecordings(); // Refresh the map
+                })
+                .catch(error => {
+                    console.error(`Error uploading to ${endpoint}:`, error);
+                    currentEndpointIndex++;
+                    tryUpload(); // Try next endpoint
+                });
+            }
+            
+            // Start the upload process
+            tryUpload();
         }
 
         // Initialize when DOM is loaded
@@ -828,13 +838,7 @@
             
             // Open upload form when clicking the + button
             uploadButton.addEventListener('click', function() {
-                // Check if we have a selected location
-                if (!selectedLocation) {
-                    // Show instruction to click on map
-                    document.getElementById('map-message').style.display = 'block';
-                } else {
-                    openUploadForm();
-                }
+                openUploadForm();
             });
             
             // Close form buttons
@@ -858,16 +862,7 @@
                 const lng = document.getElementById('longitude').value;
                 
                 if (!lat || !lng) {
-                    alert('Please click on the map to set the recording location');
-                    closeUploadForm();
-                    document.getElementById('map-message').style.display = 'block';
-                    return;
-                }
-                
-                // Check if file is selected
-                const audioFile = document.getElementById('audio-file').files[0];
-                if (!audioFile) {
-                    alert('Please select an audio file');
+                    alert('Please click on the map to set a location first');
                     return;
                 }
                 
