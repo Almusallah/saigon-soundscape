@@ -220,6 +220,47 @@
     color: white;
 }
     </style>
+// API endpoint configuration
+const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
+
+// Function to update storage info in the footer
+function updateStorageInfo() {
+    fetch(`${API_URL}/health`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch health info');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Update footer with storage info
+            const footer = document.querySelector('footer p');
+            const storageClass = data.storage.storageClass;
+            const storageWorking = data.storage.working ? 'Active' : 'Inactive';
+            const availableSpace = data.storage.availableSpace;
+            
+            footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                                 Storage: <span class="storage-indicator ${data.storage.working ? 'active' : 'inactive'}">${storageClass} (${storageWorking})</span>`;
+            
+            if (availableSpace && availableSpace !== 'Unknown') {
+                footer.innerHTML += ` | Space: ${availableSpace}`;
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching storage info:', error);
+        });
+}
+
+// Add this to your existing DOMContentLoaded event listener
+document.addEventListener('DOMContentLoaded', function() {
+    // Your existing initialization code...
+
+    // Update storage info in footer
+    updateStorageInfo();
+
+    // Update every 5 minutes
+    setInterval(updateStorageInfo, 5 * 60 * 1000);
+});
 </head>
 <body>
     <header>
