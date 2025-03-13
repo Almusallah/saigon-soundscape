@@ -166,8 +166,46 @@
         const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
 
         // Function to update storage info in the footer
-        function updateStorageInfo() {
-            fetch(`${API_URL}/health`)
+// Function to update storage info in the footer
+function updateStorageInfo() {
+  fetch(`${API_URL}/health`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to fetch health info');
+      }
+      return response.json();
+    })
+    .then(data => {
+      // Update footer with storage info
+      const footer = document.querySelector('footer p');
+      
+      // Check if data and data.storage exist
+      if (data && data.storage) {
+        const storageClass = data.storage.storageClass || 'Unknown';
+        const storageWorking = data.storage.working ? 'Active' : 'Inactive';
+        const availableSpace = data.storage.availableSpace || 'Unknown';
+        
+        footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                           Storage: <span class="storage-indicator ${data.storage.working ? 'active' : 'inactive'}">${storageClass} (${storageWorking})</span>`;
+        
+        if (availableSpace && availableSpace !== 'Unknown') {
+          footer.innerHTML += ` | Space: ${availableSpace}`;
+        }
+      } else {
+        // Fallback if data.storage doesn't exist
+        console.error('Storage information not available in API response');
+        footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                          Storage: <span class="storage-indicator inactive">Unavailable</span>`;
+      }
+    })
+    .catch(error => {
+      console.error('Error fetching storage info:', error);
+      // Update footer with error state
+      const footer = document.querySelector('footer p');
+      footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                         Storage: <span class="storage-indicator inactive">Error</span>`;
+    });
+}
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Failed to fetch health info');
