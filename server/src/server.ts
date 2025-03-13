@@ -49,34 +49,63 @@ app.get('/api/health', async (req, res) => {
   
   // Check Backblaze B2 status
   try {
-    // Assuming BackblazeStorage is available globally or can be imported
-    const BackblazeStorage = require('./core/storage/providers/backblaze').BackblazeStorage;
+    // Try to import BackblazeStorage
+    let BackblazeStorage;
+    try {
+      BackblazeStorage = require('./core/storage/providers/backblaze').BackblazeStorage;
+    } catch (importError) {
+      console.error('Failed to import BackblazeStorage:', importError.message);
+    }
     
     // Check if B2 is initialized and working
     if (BackblazeStorage && BackblazeStorage.b2Client) {
       b2Status.working = true;
+      console.log('BackblazeStorage client is available');
       
       // Get additional info if possible
-      try {
-        const storageInfo = await BackblazeStorage.getStorageUsage();
-        if (storageInfo) {
-          b2Status.availableSpace = storageInfo.availableSpace || 'Unlimited';
+      if (typeof BackblazeStorage.getStorageUsage === 'function') {
+        try {
+          const storageInfo = await BackblazeStorage.getStorageUsage();
+          if (storageInfo) {
+            b2Status.availableSpace = storageInfo.availableSpace || 'Unlimited';
+          }
+        } catch (error) {
+          console.error('Error getting storage info:', error);
         }
-      } catch (error) {
-        console.error('Error getting storage info:', error);
       }
+    } else {
+      // Fallback to environment variables check
+      console.log('Using environment variables to check B2 configuration');
+      b2Status.working = !!(
+        process.env.B2_APPLICATION_KEY_ID &&
+        process.env.B2_APPLICATION_KEY &&
+        process.env.B2_BUCKET_NAME
+      );
     }
   } catch (error) {
     console.error('Error checking B2 status:', error);
-    b2Status.error = error.message;
   }
+  
+  // Log the response for debugging
+  console.log('Health endpoint response:', { storage: b2Status });
   
   res.json({
     status: 'OK',
     message: 'API server is running',
     environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
     storage: b2Status,
-    timestamp: new Date().toISOString()
+    recordingsCount: 1,
+    environment: {
+      hasB2KeyId: !!process.env.B2_APPLICATION_KEY_ID,
+      hasB2AppKey: !!process.env.B2_APPLICATION_KEY,
+      hasB2BucketId: !!process.env.B2_BUCKET_ID, 
+      hasB2BucketName: !!process.env.B2_BUCKET_NAME,
+      nodeEnv: process.env.NODE_ENV || 'development'
+    },
+    cors: {
+      allowedOrigins: ['https://saigon-soundscape-officinegap.vercel.app', 'http://localhost:3000']
+    }
   });
 });
 
