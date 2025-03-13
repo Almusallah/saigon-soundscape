@@ -226,17 +226,32 @@
         // Event listeners for upload form
 document.addEventListener('DOMContentLoaded', function() {
     if (typeof mapboxgl === 'undefined') {
-        console.error('Mapbox GL JS failed to load');
-        document.getElementById('map').innerHTML = 'Map failed to load. Please check your internet connection.';
-    } else {
-        mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
-        const map = new mapboxgl.Map({
-            container: 'map',
-            style: 'mapbox://styles/mapbox/streets-v11',
-            center: [106.6953, 10.7765],
-            zoom: 12
-        });
+        console.error('Mapbox GL JS is not defined');
+        document.getElementById('map').innerHTML = 'Map could not be loaded. Please check your internet connection.';
+        return;
+    }
 
+    mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/streets-v11',
+        center: [106.6953, 10.7765],
+        zoom: 12
+    });
+
+    map.addControl(new mapboxgl.NavigationControl());
+
+    map.addControl(new mapboxgl.GeolocateControl({
+        positionOptions: {
+            enableHighAccuracy: true
+        },
+        trackUserLocation: true
+    }));
+
+    console.log('DOM loaded, updating storage info');
+    updateStorageInfo();
+    setInterval(updateStorageInfo, 5 * 60 * 1000);
+});
         map.addControl(new mapboxgl.NavigationControl());
 
         map.addControl(new mapboxgl.GeolocateControl({
