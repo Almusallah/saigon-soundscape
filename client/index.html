@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Saigon Sound Archive</title>
-    <script src='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js'></script>
-    <link href='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css' rel='stylesheet' />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://api.mapbox.com; style-src 'self' https://api.mapbox.com; img-src 'self' data: https:; connect-src 'self' https://saigon-soundscape-production.up.railway.app https://api.mapbox.com;">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js" crossorigin="anonymous"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" crossorigin="anonymous" />
     <style>
         body { 
             margin: 0; 
@@ -20,13 +21,6 @@
             color: white; 
             padding: 15px;
             text-align: center;
-        }
-        footer a {
-            color: white;
-            text-decoration: none;
-        }
-        footer a:hover {
-            text-decoration: underline;
         }
         .content-wrapper {
             flex: 1;
@@ -57,6 +51,49 @@
             align-items: center;
             justify-content: center;
         }
+        .upload-form-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .upload-form-container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80%;
+            overflow-y: auto;
+            position: relative;
+        }
+        .upload-form-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .form-group input, 
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
         .storage-indicator.active {
             background-color: #4CAF50;
             color: white;
@@ -69,99 +106,67 @@
             padding: 2px 5px;
             border-radius: 3px;
         }
-    </style>
-    <script>
-        // API endpoint configuration
-        const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
-
-        // Function to update storage info in the footer
-        function updateStorageInfo() {
-            console.log('Fetching storage info from:', `${API_URL}/health`);
-            
-            fetch(`${API_URL}/health`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch health info');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Health API response:', data);
-                    
-                    // Update footer with storage info
-                    const footer = document.querySelector('footer p');
-                    
-                    // Check if data has storage field
-                    if (data && data.storage) {
-                        const storageClass = data.storage.storageClass || 'Unknown';
-                        const storageWorking = data.storage.working ? 'Active' : 'Inactive';
-                        const availableSpace = data.storage.availableSpace || 'Unknown';
-                        
-                        footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                           Storage: <span class="storage-indicator ${data.storage.working ? 'active' : 'inactive'}">${storageClass} (${storageWorking})</span>`;
-                        
-                        if (availableSpace && availableSpace !== 'Unknown') {
-                            footer.innerHTML += ` | Space: ${availableSpace}`;
-                        }
-                    } else {
-                        console.error('Storage information not available in API response');
-                        footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                          Storage: <span class="storage-indicator inactive">Unavailable</span>`;
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching storage info:', error);
-                    const footer = document.querySelector('footer p');
-                    footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                      Storage: <span class="storage-indicator inactive">Error</span>`;
-                });
+        footer a {
+            color: white;
+            text-decoration: none;
         }
-    </script>
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <header>
         <h1>Saigon Sound Archive</h1>
     </header>
+    
     <div class="content-wrapper">
-        <input type="text" id="location-search" placeholder="Search for a location...">
+        <input type="text" id="location-search" placeholder="Search for a location..." style="position: absolute; top: 10px; left: 10px; z-index: 1; width: calc(100% - 20px); padding: 10px;">
         <div id="map"></div>
         <button class="upload-button" id="upload-button">+</button>
     </div>
-    <div class="form-overlay" id="form-overlay"></div>
-    <div class="upload-form" id="upload-form">
-        <h2>Upload Audio Recording</h2>
-        <form id="audio-form">
-            <div class="form-group">
-                <label for="title">Title</label>
-                <input type="text" id="title" name="title" required>
-            </div>
-            <div class="form-group">
-                <label for="description">Description</label>
-                <textarea id="description" name="description" required></textarea>
-            </div>
-            <div class="form-group">
-                <label for="audio-file">Audio File</label>
-                <input type="file" id="audio-file" name="audioFile" accept="audio/*" required>
-            </div>
-            <div class="form-group">
-                <label for="latitude">Latitude</label>
-                <input type="text" id="latitude" name="latitude" readonly>
-            </div>
-            <div class="form-group">
-                <label for="longitude">Longitude</label>
-                <input type="text" id="longitude" name="longitude" readonly>
-            </div>
-            <div class="form-actions">
-                <button type="button" id="cancel-button">Cancel</button>
-                <button type="submit" id="submit-button">Upload</button>
-            </div>
-        </form>
+    
+    <div class="upload-form-overlay" id="upload-form-overlay">
+        <div class="upload-form-container">
+            <span class="upload-form-close" id="upload-form-close">&times;</span>
+            <h2>Upload Audio Recording</h2>
+            <form id="audio-upload-form">
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="audio-file">Audio File</label>
+                    <input type="file" id="audio-file" name="audioFile" accept="audio/*" required>
+                </div>
+                <div class="form-group">
+                    <label for="latitude">Latitude</label>
+                    <input type="text" id="latitude" name="latitude" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="longitude">Longitude</label>
+                    <input type="text" id="longitude" name="longitude" readonly>
+                </div>
+                <div class="form-group">
+                    <button type="submit">Upload Recording</button>
+                    <button type="button" id="cancel-upload">Cancel</button>
+                </div>
+            </form>
+        </div>
     </div>
+    
     <footer>
         <p>&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a></p>
     </footer>
 
     <script>
+        // API endpoint configuration
+        const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
+        
         // Mapbox token
         mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
 
@@ -184,10 +189,63 @@
             trackUserLocation: true
         }));
 
-        // Initialize when DOM is loaded
+        // Function to update storage info in the footer
+        function updateStorageInfo() {
+            console.log('Fetching storage info from:', `${API_URL}/health`);
+            
+            fetch(`${API_URL}/health`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch health info');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Full Health API response:', data);
+                    
+                    const footer = document.querySelector('footer p');
+                    const storage = data.storage || {};
+                    
+                    const storageClass = storage.storageClass || 'Unknown';
+                    const storageWorking = storage.working ? 'Active' : 'Inactive';
+                    const availableSpace = storage.availableSpace || 'Unknown';
+                    
+                    footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                                       Storage: <span class="storage-indicator ${storage.working ? 'active' : 'inactive'}">${storageClass} (${storageWorking})</span>`;
+                    
+                    if (availableSpace && availableSpace !== 'Unknown') {
+                        footer.innerHTML += ` | Space: ${availableSpace}`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching storage info:', error);
+                    const footer = document.querySelector('footer p');
+                    footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                                      Storage: <span class="storage-indicator inactive">Error</span>`;
+                });
+        }
+
+        // Event listeners for upload form
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded, updating storage info');
-            // Update storage info in footer
+            const uploadButton = document.getElementById('upload-button');
+            const uploadFormOverlay = document.getElementById('upload-form-overlay');
+            const uploadFormClose = document.getElementById('upload-form-close');
+            const cancelUploadButton = document.getElementById('cancel-upload');
+
+            // Open upload form
+            uploadButton.addEventListener('click', function() {
+                uploadFormOverlay.style.display = 'flex';
+            });
+
+            // Close upload form methods
+            function closeUploadForm() {
+                uploadFormOverlay.style.display = 'none';
+            }
+
+            uploadFormClose.addEventListener('click', closeUploadForm);
+            cancelUploadButton.addEventListener('click', closeUploadForm);
+
+            // Update storage info
             updateStorageInfo();
             // Update every 5 minutes
             setInterval(updateStorageInfo, 5 * 60 * 1000);
