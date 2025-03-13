@@ -386,3 +386,29 @@ app.delete('/api/recordings/:id', (req, res) => {
     message: 'Recording removed successfully'
   });
 });
+
+// Add endpoint to delete recordings
+app.delete('/api/recordings/:id', (req, res) => {
+  const recordingId = req.params.id;
+  
+  // Find the recording by ID
+  const recordingIndex = recordings.findIndex(r => r.id === recordingId);
+  
+  if (recordingIndex === -1) {
+    return res.status(404).json({
+      success: false,
+      message: 'Recording not found'
+    });
+  }
+  
+  // Remove the recording from memory
+  const removedRecording = recordings.splice(recordingIndex, 1)[0];
+  
+  console.log(`Removed recording: ${removedRecording.id}`);
+  
+  // Success response
+  res.status(200).json({
+    success: true,
+    message: 'Recording removed successfully'
+  });
+});
