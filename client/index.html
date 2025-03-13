@@ -168,24 +168,54 @@
         // Mapbox token
         mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
 
+<script>
+    // Function to initialize map with error handling
+    function initMap() {
+        // Check if Mapbox GL JS is loaded
+        if (typeof mapboxgl === 'undefined') {
+            console.error('Mapbox GL JS is not loaded');
+            const mapContainer = document.getElementById('map');
+            if (mapContainer) {
+                mapContainer.innerHTML = 'Map could not be loaded. Please check your internet connection.';
+            }
+            return;
+        }
+
+        // Set Mapbox access token
+        mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
+
         // Initialize map
-        const map = new mapboxgl.Map({
-            container: 'map',
-            style: 'mapbox://styles/mapbox/streets-v11',
-            center: [106.6953, 10.7765], // Ho Chi Minh City
-            zoom: 12
-        });
+        try {
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v11',
+                center: [106.6953, 10.7765], // Ho Chi Minh City
+                zoom: 12
+            });
 
-        // Add navigation controls
-        map.addControl(new mapboxgl.NavigationControl());
+            // Add navigation controls
+            map.addControl(new mapboxgl.NavigationControl());
 
-        // Add geolocation control
-        map.addControl(new mapboxgl.GeolocateControl({
-            positionOptions: {
-                enableHighAccuracy: true
-            },
-            trackUserLocation: true
-        }));
+            // Add geolocation control
+            map.addControl(new mapboxgl.GeolocateControl({
+                positionOptions: {
+                    enableHighAccuracy: true
+                },
+                trackUserLocation: true
+            }));
+        } catch (error) {
+            console.error('Error initializing Mapbox:', error);
+            const mapContainer = document.getElementById('map');
+            if (mapContainer) {
+                mapContainer.innerHTML = 'Error loading map. Please try again later.';
+            }
+        }
+    }
+
+    // Initialize map when DOM is fully loaded
+    document.addEventListener('DOMContentLoaded', initMap);
+</script>
+               
 
         // Function to update storage info in the footer
         function updateStorageInfo() {
