@@ -53,19 +53,19 @@
         .hidden { display: none; }
         #recording-panel {
             position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: 20px;
+            left: 20px;
             background: white;
             padding: 20px;
             border-radius: 5px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             z-index: 2;
-            min-width: 300px;
+            width: 300px;
+            max-width: 90%;
         }
         #location-display {
             position: absolute;
-            top: 10px;
+            bottom: 10px;
             left: 10px;
             background: rgba(255,255,255,0.8);
             padding: 5px 10px;
@@ -156,6 +156,41 @@
             width: 100%;
             margin-top: 5px;
         }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .close-button {
+            background: none;
+            border: none;
+            color: #555;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 0;
+        }
+        .close-button:hover {
+            color: #000;
+        }
+        .add-audio-button {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 2;
+        }
     </style>
 </head>
 <body>
@@ -172,9 +207,14 @@
         </div>
 
         <div id="location-display"></div>
+        
+        <button id="show-panel-btn" class="add-audio-button" title="Add Audio">+</button>
 
         <div id="recording-panel" class="hidden">
-            <h3>Add Audio</h3>
+            <div class="panel-header">
+                <h3>Add Audio</h3>
+                <button class="close-button" id="close-panel-btn">&times;</button>
+            </div>
             <div class="tab-container">
                 <button class="tab-button active" data-tab="upload">Upload File</button>
                 <button class="tab-button" data-tab="record">Record Audio</button>
@@ -280,12 +320,24 @@
             const recordingIndicator = document.getElementById('recording-indicator');
             const recordingPreview = document.getElementById('recording-preview');
             const uploadRecordingButton = document.getElementById('upload-recording-button');
+            const showPanelBtn = document.getElementById('show-panel-btn');
+            const closePanelBtn = document.getElementById('close-panel-btn');
+            
+            // Show/hide panel controls
+            showPanelBtn.addEventListener('click', function() {
+                uploadPanel.classList.remove('hidden');
+                showPanelBtn.classList.add('hidden');
+            });
+            
+            closePanelBtn.addEventListener('click', function() {
+                uploadPanel.classList.add('hidden');
+                showPanelBtn.classList.remove('hidden');
+            });
             
             // Map click handler
             map.on('click', function(e) {
                 selectedLocation = e.lngLat;
                 locationDisplay.textContent = 'Selected: ' + selectedLocation.lat.toFixed(4) + ', ' + selectedLocation.lng.toFixed(4);
-                uploadPanel.classList.remove('hidden');
                 
                 // Remove previous marker
                 if (userMarker) {
@@ -296,6 +348,10 @@
                 userMarker = new mapboxgl.Marker({ color: '#F44336' })
                     .setLngLat(selectedLocation)
                     .addTo(map);
+                
+                // Show the recording panel
+                uploadPanel.classList.remove('hidden');
+                showPanelBtn.classList.add('hidden');
             });
             
             // Style switching
@@ -466,6 +522,7 @@
                     document.getElementById('upload-form').reset();
                     document.getElementById('recording-description-mic').value = '';
                     document.getElementById('recording-panel').classList.add('hidden');
+                    document.getElementById('show-panel-btn').classList.remove('hidden');
                     document.getElementById('audio-preview').style.display = 'none';
                     document.getElementById('recording-preview').style.display = 'none';
                     document.getElementById('upload-recording-button').disabled = true;
@@ -509,8 +566,8 @@
                 const el = document.createElement('div');
                 el.className = 'marker';
                 
-                // Get audio URL - handles both Backblaze and local storage
-                const audioUrl = recording.fileUrl || `${API_URL}/recordings/${recording.filename}`;
+                // Get audio URL
+                const audioUrl = recording.fileUrl;
                 
                 // Create a popup with recording details
                 const popup = new mapboxgl.Popup({ offset: 25 })
