@@ -3,8 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://api.mapbox.com 'unsafe-inline'; style-src 'self' https://api.mapbox.com 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://saigon-soundscape-production.up.railway.app https://api.mapbox.com;">
     <title>Saigon Sound Archive</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://api.mapbox.com https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' https://api.mapbox.com 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://saigon-soundscape-production.up.railway.app https://api.mapbox.com;">    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" crossorigin="anonymous" />
+    
+    <!-- Load Mapbox GL JS with error handling -->
+    <script>
+        function handleMapboxLoadError() {
+            console.error("Failed to load Mapbox GL JS");
+            if (document.getElementById("map")) {
+                document.getElementById("map").innerHTML = "<div style='padding: 20px; text-align: center;'><h3>Map could not be loaded.</h3><p>Please check your internet connection or try refreshing the page.</p></div>";
+            }
+        }
+    </script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js" crossorigin="anonymous" onerror="handleMapboxLoadError()"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" crossorigin="anonymous">
+    
     <style>
         body { 
             margin: 0; 
@@ -20,6 +33,13 @@
             padding: 15px;
             text-align: center;
         }
+        footer a {
+            color: white;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
         .content-wrapper {
             flex: 1;
             overflow: hidden;
@@ -30,6 +50,16 @@
             top: 0;
             bottom: 0;
             width: 100%;
+        }
+        .location-search {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+            width: 300px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
         }
         .upload-button {
             position: absolute;
@@ -49,49 +79,6 @@
             align-items: center;
             justify-content: center;
         }
-        .upload-form-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-        .upload-form-container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 80%;
-            overflow-y: auto;
-            position: relative;
-        }
-        .upload-form-close {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            font-size: 24px;
-            cursor: pointer;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-        }
-        .form-group input, 
-        .form-group textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
         .storage-indicator.active {
             background-color: #4CAF50;
             color: white;
@@ -104,12 +91,85 @@
             padding: 2px 5px;
             border-radius: 3px;
         }
-        footer a {
-            color: white;
-            text-decoration: none;
+        
+        /* Upload form styles */
+        .form-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
         }
-        footer a:hover {
-            text-decoration: underline;
+        
+        .upload-form {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .upload-form h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .form-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .form-close:hover {
+            color: #000;
+        }
+        
+        .recording-marker {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: #3887be;
+            border: 2px solid #ffffff;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -119,16 +179,16 @@
     </header>
     
     <div class="content-wrapper">
-        <input type="text" id="location-search" placeholder="Search for a location..." style="position: absolute; top: 10px; left: 10px; z-index: 1; width: calc(100% - 20px); padding: 10px;">
+        <input type="text" id="location-search" class="location-search" placeholder="Search for a location...">
         <div id="map"></div>
         <button class="upload-button" id="upload-button">+</button>
     </div>
     
-    <div class="upload-form-overlay" id="upload-form-overlay">
-        <div class="upload-form-container">
-            <span class="upload-form-close" id="upload-form-close">&times;</span>
+    <div class="form-overlay" id="form-overlay">
+        <div class="upload-form" id="upload-form">
+            <button class="form-close" id="form-close">&times;</button>
             <h2>Upload Audio Recording</h2>
-            <form id="audio-upload-form">
+            <form id="audio-form">
                 <div class="form-group">
                     <label for="title">Title</label>
                     <input type="text" id="title" name="title" required>
@@ -143,15 +203,18 @@
                 </div>
                 <div class="form-group">
                     <label for="latitude">Latitude</label>
-                    <input type="text" id="latitude" name="latitude" readonly>
+                    <input type="text" id="latitude" name="latitude" readonly required>
                 </div>
                 <div class="form-group">
                     <label for="longitude">Longitude</label>
-                    <input type="text" id="longitude" name="longitude" readonly>
+                    <input type="text" id="longitude" name="longitude" readonly required>
                 </div>
                 <div class="form-group">
-                    <button type="submit">Upload Recording</button>
-                    <button type="button" id="cancel-upload">Cancel</button>
+                    <p class="location-help">Click on the map to set the recording location</p>
+                </div>
+                <div class="form-actions">
+                    <button type="button" id="cancel-button">Cancel</button>
+                    <button type="submit" id="submit-button">Upload</button>
                 </div>
             </form>
         </div>
@@ -164,29 +227,65 @@
     <script>
         // API endpoint configuration
         const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
-        
-        // Mapbox token
-        mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
+        let map;
 
-<script>
-    // Function to initialize map with error handling
-    function initMap() {
-        // Check if Mapbox GL JS is loaded
-        if (typeof mapboxgl === 'undefined') {
-            console.error('Mapbox GL JS is not loaded');
-            const mapContainer = document.getElementById('map');
-            if (mapContainer) {
-                mapContainer.innerHTML = 'Map could not be loaded. Please check your internet connection.';
-            }
-            return;
+        // Function to update storage info in the footer
+        function updateStorageInfo() {
+            console.log('Fetching storage info from:', `${API_URL}/health`);
+            
+            fetch(`${API_URL}/health`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch health info');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Health API response:', data);
+                    
+                    // Update footer with storage info
+                    const footer = document.querySelector('footer p');
+                    
+                    // Check if data has storage field
+                    if (data && data.storage) {
+                        const storageClass = data.storage.storageClass || 'Unknown';
+                        const storageWorking = data.storage.working ? 'Active' : 'Inactive';
+                        const availableSpace = data.storage.availableSpace || 'Unknown';
+                        
+                        footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                                           Storage: <span class="storage-indicator ${data.storage.working ? 'active' : 'inactive'}">${storageClass} (${storageWorking})</span>`;
+                        
+                        if (availableSpace && availableSpace !== 'Unknown') {
+                            footer.innerHTML += ` | Space: ${availableSpace}`;
+                        }
+                    } else {
+                        console.error('Storage information not available in API response');
+                        footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                                          Storage: <span class="storage-indicator inactive">Unavailable</span>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching storage info:', error);
+                    const footer = document.querySelector('footer p');
+                    footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                                      Storage: <span class="storage-indicator inactive">Error</span>`;
+                });
         }
 
-        // Set Mapbox access token
-        mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
+        // Function to initialize map
+        function initMap() {
+            // Check if mapboxgl is available
+            if (typeof mapboxgl === 'undefined') {
+                console.error('Mapbox GL JS is not defined! Mapbox script may not have loaded correctly.');
+                document.getElementById('map').innerHTML = "<div style='padding: 20px; text-align: center;'><h3>Map could not be loaded.</h3><p>Please check your internet connection or try refreshing the page.</p></div>";
+                return;
+            }
 
-        // Initialize map
-        try {
-            const map = new mapboxgl.Map({
+            // Set Mapbox access token
+            mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
+            
+            // Initialize map
+            map = new mapboxgl.Map({
                 container: 'map',
                 style: 'mapbox://styles/mapbox/streets-v11',
                 center: [106.6953, 10.7765], // Ho Chi Minh City
@@ -203,107 +302,142 @@
                 },
                 trackUserLocation: true
             }));
-        } catch (error) {
-            console.error('Error initializing Mapbox:', error);
-            const mapContainer = document.getElementById('map');
-            if (mapContainer) {
-                mapContainer.innerHTML = 'Error loading map. Please try again later.';
-            }
-        }
-    }
-
-    // Initialize map when DOM is fully loaded
-    document.addEventListener('DOMContentLoaded', initMap);
-</script>
-               
-
-        // Function to update storage info in the footer
-        function updateStorageInfo() {
-            console.log('Fetching storage info from:', `${API_URL}/health`);
             
-            fetch(`${API_URL}/health`)
+            // Setup click handler for coordinates
+            map.on('click', function(e) {
+                if (document.getElementById('form-overlay').style.display === 'flex') {
+                    document.getElementById('latitude').value = e.lngLat.lat.toFixed(6);
+                    document.getElementById('longitude').value = e.lngLat.lng.toFixed(6);
+                }
+            });
+            
+            // Fetch and display existing recordings
+            fetchRecordings();
+        }
+        
+        // Function to fetch existing recordings
+        function fetchRecordings() {
+            fetch(`${API_URL}/recordings`)
                 .then(response => {
                     if (!response.ok) {
-                        throw new Error('Failed to fetch health info');
+                        throw new Error('Failed to fetch recordings');
                     }
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Full Health API response:', data);
-                    
-                    const footer = document.querySelector('footer p');
-                    const storage = data.storage || {};
-                    
-                    const storageClass = storage.storageClass || 'Unknown';
-                    const storageWorking = storage.working ? 'Active' : 'Inactive';
-                    const availableSpace = storage.availableSpace || 'Unknown';
-                    
-                    footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                       Storage: <span class="storage-indicator ${storage.working ? 'active' : 'inactive'}">${storageClass} (${storageWorking})</span>`;
-                    
-                    if (availableSpace && availableSpace !== 'Unknown') {
-                        footer.innerHTML += ` | Space: ${availableSpace}`;
+                    if (data && data.recordings && data.recordings.length > 0) {
+                        addRecordingMarkers(data.recordings);
                     }
                 })
                 .catch(error => {
-                    console.error('Error fetching storage info:', error);
-                    const footer = document.querySelector('footer p');
-                    footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                      Storage: <span class="storage-indicator inactive">Error</span>`;
+                    console.error('Error fetching recordings:', error);
                 });
         }
+        
+        // Function to add markers for recordings
+        function addRecordingMarkers(recordings) {
+            if (!recordings || !recordings.length || !map) return;
+            
+            recordings.forEach(recording => {
+                // Create custom marker element
+                const el = document.createElement('div');
+                el.className = 'recording-marker';
+                
+                // Create popup with recording info
+                const popup = new mapboxgl.Popup({ offset: 25 })
+                    .setHTML(`
+                        <h3>${recording.title}</h3>
+                        <p>${recording.description}</p>
+                        <audio controls>
+                            <source src="${recording.audioUrl}" type="audio/mpeg">
+                            Your browser does not support the audio element.
+                        </audio>
+                    `);
+                
+                // Add marker to map
+                new mapboxgl.Marker(el)
+                    .setLngLat([recording.longitude, recording.latitude])
+                    .setPopup(popup)
+                    .addTo(map);
+            });
+        }
 
-        // Event listeners for upload form
-document.addEventListener('DOMContentLoaded', function() {
-    if (typeof mapboxgl === 'undefined') {
-        console.error('Mapbox GL JS is not defined');
-        document.getElementById('map').innerHTML = 'Map could not be loaded. Please check your internet connection.';
-        return;
-    }
-
-    mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
-    const map = new mapboxgl.Map({
-        container: 'map',
-        style: 'mapbox://styles/mapbox/streets-v11',
-        center: [106.6953, 10.7765],
-        zoom: 12
-    });
-
-    map.addControl(new mapboxgl.NavigationControl());
-
-    map.addControl(new mapboxgl.GeolocateControl({
-        positionOptions: {
-            enableHighAccuracy: true
-        },
-        trackUserLocation: true
-    }));
-
-    console.log('DOM loaded, updating storage info');
-    updateStorageInfo();
-    setInterval(updateStorageInfo, 5 * 60 * 1000);
-});
-        map.addControl(new mapboxgl.NavigationControl());
-
-        map.addControl(new mapboxgl.GeolocateControl({
-            positionOptions: {
-                enableHighAccuracy: true
-            },
-            trackUserLocation: true
-        }));
-    }
-
-    console.log('DOM loaded, updating storage info');
-    updateStorageInfo();
-    setInterval(updateStorageInfo, 5 * 60 * 1000);
-});
-            // Close upload form methods
-            function closeUploadForm() {
-                uploadFormOverlay.style.display = 'none';
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing app');
+            
+            // Initialize map
+            initMap();
+            
+            // Select form elements
+            const uploadButton = document.getElementById('upload-button');
+            const formOverlay = document.getElementById('form-overlay');
+            const uploadForm = document.getElementById('upload-form');
+            const closeFormButton = document.getElementById('form-close');
+            const cancelButton = document.getElementById('cancel-button');
+            const audioForm = document.getElementById('audio-form');
+            
+            // Open upload form
+            uploadButton.addEventListener('click', function() {
+                formOverlay.style.display = 'flex';
+            });
+            
+            // Close upload form
+            function closeForm() {
+                formOverlay.style.display = 'none';
             }
-
-            uploadFormClose.addEventListener('click', closeUploadForm);
-            cancelUploadButton.addEventListener('click', closeUploadForm);
-
+            
+            closeFormButton.addEventListener('click', closeForm);
+            cancelButton.addEventListener('click', closeForm);
+            
+            // Close form when clicking outside
+            formOverlay.addEventListener('click', function(e) {
+                if (e.target === formOverlay) {
+                    closeForm();
+                }
+            });
+            
+            // Handle form submission
+            audioForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(audioForm);
+                
+                // Add loading state
+                const submitButton = document.getElementById('submit-button');
+                const originalText = submitButton.textContent;
+                submitButton.textContent = 'Uploading...';
+                submitButton.disabled = true;
+                
+                fetch(`${API_URL}/upload`, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to upload recording');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Upload successful:', data);
+                    alert('Recording uploaded successfully!');
+                    audioForm.reset();
+                    closeForm();
+                    
+                    // Refresh recordings
+                    fetchRecordings();
+                })
+                .catch(error => {
+                    console.error('Error uploading recording:', error);
+                    alert('Failed to upload recording. Please try again.');
+                })
+                .finally(() => {
+                    submitButton.textContent = originalText;
+                    submitButton.disabled = false;
+                });
+            });
+            
             // Update storage info
             updateStorageInfo();
             // Update every 5 minutes
