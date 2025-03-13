@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h2>Testing Railway API Connection</h2>
+    <div id="result">Testing...</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const resultDiv = document.getElementById('result');
+            
+            fetch('https://saigon-soundscape-production.up.railway.app/api/health')
+                .then(response => {
+                    resultDiv.innerHTML += `<p>Response status: ${response.status}</p>`;
+                    return response.json();
+                })
+                .then(data => {
+                    resultDiv.innerHTML += `<p>Data received: ${JSON.stringify(data)}</p>`;
+                })
+                .catch(error => {
+                    resultDiv.innerHTML += `<p>Error: ${error.message}</p>`;
+                });
+        });
+    </script>
+</body>
+</html>
