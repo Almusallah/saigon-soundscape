@@ -90,7 +90,7 @@
             width: 100%;
             padding: 8px;
         }
-        button[type="submit"] {
+        button {
             background: #4CAF50;
             color: white;
             border: none;
@@ -98,8 +98,63 @@
             cursor: pointer;
             border-radius: 4px;
         }
-        button[type="submit"]:hover {
+        button:hover {
             background: #45a049;
+        }
+        .tab-container {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .tab-button {
+            padding: 8px 12px;
+            background: #f1f1f1;
+            border: none;
+            border-radius: 4px 4px 0 0;
+            margin-right: 5px;
+            cursor: pointer;
+        }
+        .tab-button.active {
+            background: #4CAF50;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .record-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .record-button {
+            background-color: #f44336;
+        }
+        .stop-button {
+            background-color: #555;
+        }
+        .recording-indicator {
+            color: #f44336;
+            margin-top: 5px;
+            font-weight: bold;
+            display: none;
+        }
+        .marker {
+            background-size: cover;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            background-color: rgba(66, 133, 244, 0.8);
+            border: 2px solid white;
+        }
+        .popup-content {
+            padding: 5px;
+        }
+        .popup-content audio {
+            width: 100%;
+            margin-top: 5px;
         }
     </style>
 </head>
@@ -119,13 +174,31 @@
         <div id="location-display"></div>
 
         <div id="recording-panel" class="hidden">
-            <h3>Upload Audio</h3>
-            <form id="upload-form">
-                <input type="file" id="audio-file" accept="audio/*" required>
-                <audio id="audio-preview" controls style="display:none;"></audio>
-                <textarea id="recording-description" placeholder="Description" required></textarea>
-                <button type="submit">Upload</button>
-            </form>
+            <h3>Add Audio</h3>
+            <div class="tab-container">
+                <button class="tab-button active" data-tab="upload">Upload File</button>
+                <button class="tab-button" data-tab="record">Record Audio</button>
+            </div>
+
+            <div id="upload-tab" class="tab-content active">
+                <form id="upload-form">
+                    <input type="file" id="audio-file" accept="audio/*" required>
+                    <audio id="audio-preview" controls style="display:none;"></audio>
+                    <textarea id="recording-description" placeholder="Description" required></textarea>
+                    <button type="submit">Upload</button>
+                </form>
+            </div>
+
+            <div id="record-tab" class="tab-content">
+                <div class="record-controls">
+                    <button id="record-button" class="record-button">Start Recording</button>
+                    <button id="stop-button" class="stop-button" disabled>Stop</button>
+                </div>
+                <div id="recording-indicator" class="recording-indicator">Recording...</div>
+                <audio id="recording-preview" controls style="display:none;"></audio>
+                <textarea id="recording-description-mic" placeholder="Description" required></textarea>
+                <button id="upload-recording-button" disabled>Upload Recording</button>
+            </div>
         </div>
     </div>
 
@@ -134,12 +207,42 @@
     </footer>
 
     <script>
+        // Initialize variables
+        const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
+        let map;
+        let userMarker;
+        let selectedLocation;
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedBlob;
+        let markers = [];
+
         // Initialize map when the page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Tab switching
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabName = this.getAttribute('data-tab');
+                    
+                    // Update active tab button
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show active tab content
+                    tabContents.forEach(content => {
+                        content.classList.remove('active');
+                    });
+                    document.getElementById(tabName + '-tab').classList.add('active');
+                });
+            });
+            
+            // Initialize Mapbox
             mapboxgl.accessToken = 'pk.eyJ1Ijoic2lkZXdhbGtjaXR5IiwiYSI6ImNtN2c3Z28zZzBiZmsya3M3eXU2emEzOXQifQ.hLfguhn2EXIhg3XZL1_Dcw';
             
-            // Create map
-            var map = new mapboxgl.Map({
+            map = new mapboxgl.Map({
                 container: 'map',
                 style: 'mapbox://styles/mapbox/streets-v12',
                 center: [106.6953, 10.7719], // Ho Chi Minh City
@@ -149,18 +252,34 @@
             // Add navigation control
             map.addControl(new mapboxgl.NavigationControl());
             
-            // Variables
-            var userMarker = null;
-            var selectedLocation = null;
+            // Check API connection
+            fetch(`${API_URL}/health`)
+                .then(response => {
+                    if (response.ok) {
+                        console.log('API connected successfully');
+                        // Load existing recordings
+                        loadRecordings();
+                    } else {
+                        console.error('API connection failed');
+                    }
+                })
+                .catch(error => {
+                    console.error('API connection error:', error);
+                });
             
             // DOM elements
-            var streetViewBtn = document.getElementById('street-view-btn');
-            var satelliteViewBtn = document.getElementById('satellite-view-btn');
-            var locationDisplay = document.getElementById('location-display');
-            var uploadForm = document.getElementById('upload-form');
-            var fileInput = document.getElementById('audio-file');
-            var uploadPanel = document.getElementById('recording-panel');
-            var audioPreview = document.getElementById('audio-preview');
+            const streetViewBtn = document.getElementById('street-view-btn');
+            const satelliteViewBtn = document.getElementById('satellite-view-btn');
+            const locationDisplay = document.getElementById('location-display');
+            const uploadForm = document.getElementById('upload-form');
+            const fileInput = document.getElementById('audio-file');
+            const uploadPanel = document.getElementById('recording-panel');
+            const audioPreview = document.getElementById('audio-preview');
+            const recordButton = document.getElementById('record-button');
+            const stopButton = document.getElementById('stop-button');
+            const recordingIndicator = document.getElementById('recording-indicator');
+            const recordingPreview = document.getElementById('recording-preview');
+            const uploadRecordingButton = document.getElementById('upload-recording-button');
             
             // Map click handler
             map.on('click', function(e) {
@@ -174,7 +293,7 @@
                 }
                 
                 // Add new marker
-                userMarker = new mapboxgl.Marker()
+                userMarker = new mapboxgl.Marker({ color: '#F44336' })
                     .setLngLat(selectedLocation)
                     .addTo(map);
             });
@@ -194,7 +313,7 @@
             
             // File upload handler
             fileInput.addEventListener('change', function(e) {
-                var file = e.target.files[0];
+                const file = e.target.files[0];
                 if (!file) return;
                 
                 // Preview audio file
@@ -211,21 +330,210 @@
                     return;
                 }
                 
-                var audioFile = fileInput.files[0];
+                const audioFile = fileInput.files[0];
                 if (!audioFile) {
                     alert('Please select an audio file');
                     return;
                 }
                 
-                // Simulate successful upload
-                alert('Audio upload simulation successful!');
+                const description = document.getElementById('recording-description').value;
                 
-                // Clear form and UI
-                uploadForm.reset();
-                uploadPanel.classList.add('hidden');
-                audioPreview.style.display = 'none';
+                // Create form data for upload
+                const formData = new FormData();
+                formData.append('audio', audioFile);
+                formData.append('description', description);
+                formData.append('lat', selectedLocation.lat);
+                formData.append('lng', selectedLocation.lng);
+                
+                // Upload to server
+                uploadAudio(formData);
+            });
+            
+            // Microphone recording handlers
+            recordButton.addEventListener('click', function() {
+                startRecording();
+            });
+            
+            stopButton.addEventListener('click', function() {
+                stopRecording();
+            });
+            
+            uploadRecordingButton.addEventListener('click', function() {
+                if (!selectedLocation) {
+                    alert('Please select a location on the map');
+                    return;
+                }
+                
+                if (!recordedBlob) {
+                    alert('Please record audio first');
+                    return;
+                }
+                
+                const description = document.getElementById('recording-description-mic').value;
+                
+                // Create form data for upload
+                const formData = new FormData();
+                formData.append('audio', recordedBlob, 'recording.webm');
+                formData.append('description', description);
+                formData.append('lat', selectedLocation.lat);
+                formData.append('lng', selectedLocation.lng);
+                
+                // Upload to server
+                uploadAudio(formData);
             });
         });
+        
+        // Function to start recording
+        function startRecording() {
+            // Check if browser supports getUserMedia
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('Your browser does not support recording audio');
+                return;
+            }
+            
+            // Get audio from microphone
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    audioChunks = [];
+                    mediaRecorder = new MediaRecorder(stream);
+                    
+                    // Store audio chunks
+                    mediaRecorder.addEventListener('dataavailable', event => {
+                        audioChunks.push(event.data);
+                    });
+                    
+                    // Handle recording stop
+                    mediaRecorder.addEventListener('stop', () => {
+                        recordedBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const audioURL = URL.createObjectURL(recordedBlob);
+                        
+                        // Display preview
+                        const recordingPreview = document.getElementById('recording-preview');
+                        recordingPreview.src = audioURL;
+                        recordingPreview.style.display = 'block';
+                        
+                        // Enable upload button
+                        document.getElementById('upload-recording-button').disabled = false;
+                        
+                        // Hide recording indicator
+                        document.getElementById('recording-indicator').style.display = 'none';
+                    });
+                    
+                    // Start recording
+                    mediaRecorder.start();
+                    
+                    // Update UI
+                    document.getElementById('record-button').disabled = true;
+                    document.getElementById('stop-button').disabled = false;
+                    document.getElementById('recording-indicator').style.display = 'block';
+                })
+                .catch(error => {
+                    console.error('Error accessing microphone:', error);
+                    alert('Could not access microphone. Please check permissions.');
+                });
+        }
+        
+        // Function to stop recording
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                
+                // Stop all microphone tracks
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                
+                // Update UI
+                document.getElementById('record-button').disabled = false;
+                document.getElementById('stop-button').disabled = true;
+            }
+        }
+        
+        // Function to upload audio to server
+        function uploadAudio(formData) {
+            fetch(`${API_URL}/recordings`, {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Upload failed with status: ' + response.status);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    alert('Audio uploaded successfully!');
+                    
+                    // Reset UI
+                    document.getElementById('upload-form').reset();
+                    document.getElementById('recording-description-mic').value = '';
+                    document.getElementById('recording-panel').classList.add('hidden');
+                    document.getElementById('audio-preview').style.display = 'none';
+                    document.getElementById('recording-preview').style.display = 'none';
+                    document.getElementById('upload-recording-button').disabled = true;
+                    recordedBlob = null;
+                    
+                    // Add the new recording to the map
+                    addRecordingMarker(data.data);
+                })
+                .catch(error => {
+                    console.error('Upload error:', error);
+                    alert('Failed to upload audio: ' + error.message);
+                });
+        }
+        
+        // Function to load existing recordings
+        function loadRecordings() {
+            fetch(`${API_URL}/recordings`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch recordings');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Display recordings on the map
+                    if (data.data && data.data.length > 0) {
+                        data.data.forEach(recording => {
+                            addRecordingMarker(recording);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching recordings:', error);
+                });
+        }
+        
+        // Function to add a recording marker to the map
+        function addRecordingMarker(recording) {
+            try {
+                // Create a marker element
+                const el = document.createElement('div');
+                el.className = 'marker';
+                
+                // Get audio URL - handles both Backblaze and local storage
+                const audioUrl = recording.fileUrl || `${API_URL}/recordings/${recording.filename}`;
+                
+                // Create a popup with recording details
+                const popup = new mapboxgl.Popup({ offset: 25 })
+                    .setHTML(`
+                        <div class="popup-content">
+                            <strong>${recording.description}</strong>
+                            <p>Uploaded: ${new Date(recording.uploadedAt).toLocaleString()}</p>
+                            <audio controls src="${audioUrl}"></audio>
+                        </div>
+                    `);
+                
+                // Add marker to map
+                const marker = new mapboxgl.Marker(el)
+                    .setLngLat([recording.location.lng, recording.location.lat])
+                    .setPopup(popup)
+                    .addTo(map);
+                
+                // Store marker reference
+                markers.push(marker);
+            } catch (error) {
+                console.error('Error adding marker:', error);
+            }
+        }
     </script>
 </body>
 </html>

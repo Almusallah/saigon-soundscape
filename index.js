@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const B2 = require('backblaze-b2');
 
 // Initialize express app
 const app = express();
@@ -15,16 +16,14 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Create uploads directory
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file storage
+// Configure multer for temporary file storage
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadsDir);
+    const tempDir = path.join(__dirname, 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    cb(null, tempDir);
   },
   filename: function (req, file, cb) {
     const ext = path.extname(file.originalname);
@@ -44,6 +43,63 @@ const upload = multer({
     }
   }
 });
+
+// Backblaze B2 configuration
+const b2 = new B2({
+  applicationKeyId: process.env.B2_APPLICATION_KEY_ID || 'your_key_id',
+  applicationKey: process.env.B2_APPLICATION_KEY || 'your_application_key'
+});
+
+// Initialize Backblaze
+async function setupB2() {
+  try {
+    await b2.authorize();
+    console.log('Backblaze B2 authorized successfully');
+  } catch (error) {
+    console.error('Backblaze B2 authorization error:', error);
+  }
+}
+setupB2();
+
+// Upload file to Backblaze B2
+async function uploadToB2(filePath, fileName, mimeType) {
+  try {
+    // Get upload URL
+    const bucketId = process.env.B2_BUCKET_ID || 'ef79192b1a1865094580d1b';
+    const bucketName = process.env.B2_BUCKET_NAME || 'saigon-soundscape-audio';
+    
+    const { data: { uploadUrl, authorizationToken } } = await b2.getUploadUrl({
+      bucketId: bucketId
+    });
+
+    // Read file
+    const fileBuffer = fs.readFileSync(filePath);
+    
+    // Upload file
+    const { data } = await b2.uploadFile({
+      uploadUrl: uploadUrl,
+      uploadAuthToken: authorizationToken,
+      fileName: fileName,
+      data: fileBuffer,
+      contentType: mimeType
+    });
+
+    // Delete temporary file
+    fs.unlinkSync(filePath);
+
+    // Return file info
+    return {
+      fileId: data.fileId,
+      fileName: data.fileName,
+      contentType: mimeType,
+      bucketId: bucketId,
+      url: `https://f004.backblazeb2.com/file/${bucketName}/${fileName}`
+    };
+  } catch (error) {
+    console.error('Backblaze upload error:', error);
+    throw error;
+  }
+}
 
 // In-memory storage for recordings (replace with database in production)
 const recordings = [];
@@ -72,7 +128,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // File upload endpoint
-app.post('/api/recordings', upload.single('audio'), (req, res) => {
+app.post('/api/recordings', upload.single('audio'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -82,37 +138,62 @@ app.post('/api/recordings', upload.single('audio'), (req, res) => {
     }
 
     // Log file details
-    console.log('File uploaded:', {
+    console.log('File received:', {
       filename: req.file.filename,
       size: req.file.size,
       mimetype: req.file.mimetype
     });
 
-    // Create recording entry
-    const recordingId = uuidv4();
-    const newRecording = {
-      id: recordingId,
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      size: req.file.size,
-      description: req.body.description || '',
-      location: {
-        lat: parseFloat(req.body.lat),
-        lng: parseFloat(req.body.lng)
-      },
-      uploadedAt: new Date().toISOString()
-    };
+    try {
+      // Upload to Backblaze B2
+      const fileName = `recordings/${uuidv4()}${path.extname(req.file.originalname)}`;
+      const uploadResult = await uploadToB2(
+        req.file.path,
+        fileName,
+        req.file.mimetype
+      );
 
-    // Store recording in memory (would be database in production)
-    recordings.push(newRecording);
+      // Create recording entry
+      const recordingId = uuidv4();
+      const newRecording = {
+        id: recordingId,
+        fileId: uploadResult.fileId,
+        fileName: uploadResult.fileName,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        description: req.body.description || '',
+        fileUrl: uploadResult.url,
+        location: {
+          lat: parseFloat(req.body.lat),
+          lng: parseFloat(req.body.lng)
+        },
+        uploadedAt: new Date().toISOString()
+      };
 
-    // Success response
-    res.status(201).json({
-      success: true,
-      message: 'Recording uploaded successfully',
-      data: newRecording
-    });
+      // Store recording in memory (would be database in production)
+      recordings.push(newRecording);
+
+      // Success response
+      res.status(201).json({
+        success: true,
+        message: 'Recording uploaded successfully',
+        data: newRecording
+      });
+    } catch (uploadError) {
+      console.error('Backblaze upload error:', uploadError);
+      
+      // Clean up temporary file if it exists
+      if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+        fs.unlinkSync(req.file.path);
+      }
+      
+      return res.status(500).json({
+        success: false,
+        message: 'Error uploading to cloud storage',
+        error: uploadError.message
+      });
+    }
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({
@@ -130,20 +211,6 @@ app.get('/api/recordings', (req, res) => {
     count: recordings.length,
     data: recordings
   });
-});
-
-// Serve uploaded files
-app.get('/api/recordings/:filename', (req, res) => {
-  const filePath = path.join(uploadsDir, req.params.filename);
-  
-  if (fs.existsSync(filePath)) {
-    res.sendFile(filePath);
-  } else {
-    res.status(404).json({
-      success: false,
-      message: 'Recording not found'
-    });
-  }
 });
 
 // Error handler
