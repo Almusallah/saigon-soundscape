@@ -47,116 +47,82 @@ const upload = multer({
   }
 });
 
-// Backblaze integration - with fallback for local storage
-let b2;
-let useLocalStorage = false;
-let setupComplete = false;
-
-try {
-  // First check if the module exists
-  require.resolve('backblaze-b2');
-  
-  // If it doesn't throw an error, load it
-  const B2 = require('backblaze-b2');
-  
-  b2 = new B2({
-    applicationKeyId: process.env.B2_APPLICATION_KEY_ID || 'your_key_id',
-    applicationKey: process.env.B2_APPLICATION_KEY || 'your_application_key'
-  });
-  
-  console.log('Backblaze B2 module loaded successfully', {
-    keyId: process.env.B2_APPLICATION_KEY_ID ? 'Set' : 'Not set',
-    appKey: process.env.B2_APPLICATION_KEY ? 'Set' : 'Not set',
-    bucketId: process.env.B2_BUCKET_ID ? 'Set' : 'Not set',
-    bucketName: process.env.B2_BUCKET_NAME ? 'Set' : 'Not set'
-  });
-} catch (error) {
-  console.error('Failed to load Backblaze B2 module:', error.message);
-  console.log('Falling back to local storage');
-  useLocalStorage = true;
-  setupComplete = true;
-}
-
-// Initialize Backblaze if available
-async function setupB2() {
-  if (useLocalStorage || setupComplete) return;
-  
-  try {
-    await b2.authorize();
-    console.log('Backblaze B2 authorized successfully');
-    setupComplete = true;
-  } catch (error) {
-    console.error('Backblaze B2 authorization error:', error);
-    console.log('Falling back to local storage');
-    useLocalStorage = true;
-    setupComplete = true;
-  }
-}
-
-// Upload file to Backblaze B2
-async function uploadToB2(filePath, fileName, mimeType) {
-  // Make sure setup is complete
-  if (!setupComplete) {
-    await setupB2();
-  }
-
-  if (useLocalStorage) {
-    // Local storage fallback
-    const uploadsDir = path.join(__dirname, 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    
-    const destPath = path.join(uploadsDir, fileName);
-    fs.copyFileSync(filePath, destPath);
-    
-    return {
-      fileName: fileName,
-      contentType: mimeType,
-      url: `/api/uploads/${fileName}`
-    };
-  } else {
-    try {
-      // Get upload URL
-      const bucketId = process.env.B2_BUCKET_ID || 'ef791392b1a1865094580d1b';
-      const bucketName = process.env.B2_BUCKET_NAME || 'saigon-soundscape-audio';
-      
-      const { data: { uploadUrl, authorizationToken } } = await b2.getUploadUrl({
-        bucketId: bucketId
-      });
-
-      // Read file
-      const fileBuffer = fs.readFileSync(filePath);
-      
-      // Upload file
-      const { data } = await b2.uploadFile({
-        uploadUrl: uploadUrl,
-        uploadAuthToken: authorizationToken,
-        fileName: fileName,
-        data: fileBuffer,
-        contentType: mimeType
-      });
-
-      // Return file info
-      return {
-        fileId: data.fileId,
-        fileName: data.fileName,
-        contentType: mimeType,
-        bucketId: bucketId,
-        url: `https://f004.backblazeb2.com/file/${bucketName}/${fileName}`
-      };
-    } catch (error) {
-      console.error('Backblaze upload error:', error);
-      
-      // Fall back to local storage on error
-      useLocalStorage = true;
-      return await uploadToB2(filePath, fileName, mimeType);
-    }
-  }
-}
-
-// In-memory storage for recordings (replace with database in production)
+// In-memory storage for recordings
 const recordings = [];
+
+// Create uploads directory for local files
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Handle file upload
+async function handleFileUpload(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No audio file uploaded'
+      });
+    }
+
+    console.log('File received:', {
+      filename: req.file.filename,
+      size: req.file.size,
+      mimetype: req.file.mimetype
+    });
+
+    // Generate a unique filename
+    const fileName = `recordings/${uuidv4()}${path.extname(req.file.originalname)}`;
+    
+    // Create file URL (local for now)
+    const fileUrl = `/api/uploads/${req.file.filename}`;
+    
+    // Copy to uploads directory
+    fs.copyFileSync(req.file.path, path.join(uploadsDir, req.file.filename));
+
+    // Create recording entry
+    const recordingId = uuidv4();
+    const newRecording = {
+      id: recordingId,
+      fileName: req.file.filename,
+      originalName: req.file.originalname,
+      mimeType: req.file.mimetype,
+      size: req.file.size,
+      description: req.body.description || '',
+      fileUrl: fileUrl,
+      location: {
+        lat: parseFloat(req.body.lat),
+        lng: parseFloat(req.body.lng)
+      },
+      uploadedAt: new Date().toISOString()
+    };
+
+    // Store recording in memory
+    recordings.push(newRecording);
+
+    // Clean up temporary file
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch (unlinkErr) {
+      console.error('Failed to remove temp file:', unlinkErr);
+    }
+
+    // Return success
+    res.status(201).json({
+      success: true,
+      message: 'Recording uploaded successfully',
+      data: newRecording
+    });
+  } catch (error) {
+    console.error('Upload handling error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error processing upload',
+      error: error.message
+    });
+  }
+}
 
 // Middleware for logging
 app.use((req, res, next) => {
@@ -169,7 +135,7 @@ app.get('/', (req, res) => {
   res.json({
     message: 'Saigon Soundscape API is running',
     endpoints: ['/api/health', '/api/recordings'],
-    storageType: useLocalStorage ? 'local' : 'Backblaze B2'
+    storageType: 'local' // Always use local storage for now
   });
 });
 
@@ -179,7 +145,7 @@ app.get('/api/health', (req, res) => {
     status: 'OK',
     message: 'API server is running',
     timestamp: new Date().toISOString(),
-    storageType: useLocalStorage ? 'local' : 'Backblaze B2',
+    storageType: 'local',
     environment: {
       hasB2KeyId: !!process.env.B2_APPLICATION_KEY_ID,
       hasB2AppKey: !!process.env.B2_APPLICATION_KEY,
@@ -196,123 +162,17 @@ app.get('/api/health', (req, res) => {
 // File upload endpoint
 app.post('/api/recordings', (req, res, next) => {
   console.log('Received upload request');
-  
-  // Use a try-catch to prevent uncaught exceptions
-  try {
-    upload.single('audio')(req, res, function(err) {
-      if (err) {
-        console.error('Multer error:', err);
-        return res.status(400).json({
-          success: false,
-          message: err.message
-        });
-      }
-      
-      // Continue with handling the upload
-      handleFileUpload(req, res, next);
-    });
-  } catch (error) {
-    console.error('Upload middleware error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error in upload middleware',
-      error: error.message
-    });
-  }
-});
-
-// Separate function to handle the file after upload
-async function handleFileUpload(req, res, next) {
-  try {
-    if (!req.file) {
+  upload.single('audio')(req, res, function(err) {
+    if (err) {
+      console.error('Multer error:', err);
       return res.status(400).json({
         success: false,
-        message: 'No audio file uploaded'
+        message: err.message
       });
     }
-
-    // Log file details
-    console.log('File received:', {
-      filename: req.file.filename,
-      size: req.file.size,
-      mimetype: req.file.mimetype,
-      path: req.file.path
-    });
-
-    try {
-      // Upload to Backblaze B2
-      const fileName = `recordings/${uuidv4()}${path.extname(req.file.originalname)}`;
-      const uploadResult = await uploadToB2(
-        req.file.path,
-        fileName,
-        req.file.mimetype
-      );
-
-      // Create recording entry
-      const recordingId = uuidv4();
-      const newRecording = {
-        id: recordingId,
-        fileId: uploadResult.fileId,
-        fileName: uploadResult.fileName,
-        originalName: req.file.originalname,
-        mimeType: req.file.mimetype,
-        size: req.file.size,
-        description: req.body.description || '',
-        fileUrl: uploadResult.url,
-        location: {
-          lat: parseFloat(req.body.lat),
-          lng: parseFloat(req.body.lng)
-        },
-        uploadedAt: new Date().toISOString()
-      };
-
-      // Store recording in memory (would be database in production)
-      recordings.push(newRecording);
-
-      // Clean up temporary file if it exists
-      if (fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-
-      // Success response
-      res.status(201).json({
-        success: true,
-        message: 'Recording uploaded successfully',
-        data: newRecording
-      });
-    } catch (uploadError) {
-      console.error('Backblaze upload error:', uploadError);
-      
-      // Clean up temporary file if it exists
-      if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-      
-      return res.status(500).json({
-        success: false,
-        message: 'Error uploading to cloud storage',
-        error: uploadError.message
-      });
-    }
-  } catch (error) {
-    console.error('Upload error:', error);
-    
-    // Clean up temporary file if it exists
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (unlinkError) {
-        console.error('Failed to clean up temp file:', unlinkError);
-      }
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Server error during upload',
-      error: error.message
-    });
-  }
-}
+    handleFileUpload(req, res).catch(next);
+  });
+});
 
 // Get all recordings
 app.get('/api/recordings', (req, res) => {
@@ -323,9 +183,9 @@ app.get('/api/recordings', (req, res) => {
   });
 });
 
-// Serve local files if using local storage
+// Serve uploaded files
 app.get('/api/uploads/:filename', (req, res) => {
-  const filePath = path.join(__dirname, 'uploads', req.params.filename);
+  const filePath = path.join(uploadsDir, req.params.filename);
   
   if (fs.existsSync(filePath)) {
     res.sendFile(filePath);
@@ -350,11 +210,4 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
-  
-  // Initialize Backblaze in the background
-  if (!useLocalStorage && !setupComplete) {
-    setupB2().catch(error => {
-      console.error('Failed to set up Backblaze:', error);
-    });
-  }
 });
