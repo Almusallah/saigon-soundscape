@@ -6,7 +6,7 @@
     <title>Saigon Sound Archive</title>
     <script src='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css' rel='stylesheet' />
-    <style>
+  <style>
         body { 
             margin: 0; 
             padding: 0; 
@@ -191,6 +191,34 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             z-index: 2;
         }
+.report-button {
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    color: #666;
+    font-size: 12px;
+    padding: 3px 8px;
+    margin-top: 5px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+.report-button:hover {
+    background: #e0e0e0;
+}
+
+.storage-indicator {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.8em;
+}
+.storage-indicator.active {
+    background-color: #4CAF50;
+    color: white;
+}
+.storage-indicator.inactive {
+    background-color: #FF5722;
+    color: white;
+}
     </style>
 </head>
 <body>
@@ -259,6 +287,11 @@
 
         // Initialize map when the page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Update storage info in footer
+updateStorageInfo();
+
+// Update every 5 minutes
+setInterval(updateStorageInfo, 5 * 60 * 1000);
             // Tab switching
             const tabButtons = document.querySelectorAll('.tab-button');
             const tabContents = document.querySelectorAll('.tab-content');
@@ -558,39 +591,49 @@
                     console.error('Error fetching recordings:', error);
                 });
         }
+
+// Function to report a recording
+function reportRecording(id) {
+    alert('Thank you for your report. Our moderators will review this content.');
+    console.log('Recording reported:', id);
+    
+    // Here you could add an actual API call to store reports
+    // fetch(`${API_URL}/recordings/${id}/report`, { method: 'POST' });
+}
+
+// Function to add a recording marker to the map
+function addRecordingMarker(recording) {
+    try {
+        // Create a marker element
+        const el = document.createElement('div');
+        el.className = 'marker';
         
-        // Function to add a recording marker to the map
-        function addRecordingMarker(recording) {
-            try {
-                // Create a marker element
-                const el = document.createElement('div');
-                el.className = 'marker';
-                
-                // Get audio URL
-                const audioUrl = recording.fileUrl;
-                
-                // Create a popup with recording details
-                const popup = new mapboxgl.Popup({ offset: 25 })
-                    .setHTML(`
-                        <div class="popup-content">
-                            <strong>${recording.description}</strong>
-                            <p>Uploaded: ${new Date(recording.uploadedAt).toLocaleString()}</p>
-                            <audio controls src="${audioUrl}"></audio>
-                        </div>
-                    `);
-                
-                // Add marker to map
-                const marker = new mapboxgl.Marker(el)
-                    .setLngLat([recording.location.lng, recording.location.lat])
-                    .setPopup(popup)
-                    .addTo(map);
-                
-                // Store marker reference
-                markers.push(marker);
-            } catch (error) {
-                console.error('Error adding marker:', error);
-            }
-        }
+        // Get audio URL
+        const audioUrl = recording.fileUrl;
+        
+        // Create a popup with recording details
+        const popup = new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`
+                <div class="popup-content">
+                    <strong>${recording.description}</strong>
+                    <p>Uploaded: ${new Date(recording.uploadedAt).toLocaleString()}</p>
+                    <audio controls src="${audioUrl}"></audio>
+                    <button onclick="reportRecording('${recording.id}')" class="report-button">Report Inappropriate Content</button>
+                </div>
+            `);
+        
+        // Add marker to map
+        const marker = new mapboxgl.Marker(el)
+            .setLngLat([recording.location.lng, recording.location.lat])
+            .setPopup(popup)
+            .addTo(map);
+        
+        // Store marker reference
+        markers.push(marker);
+    } catch (error) {
+        console.error('Error adding marker:', error);
+    }
+}        
     </script>
 </body>
 </html>

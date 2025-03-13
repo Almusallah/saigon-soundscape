@@ -170,7 +170,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'Saigon Soundscape API is running',
-    endpoints: ['/api/health', '/api/recordings', '/api/uploads/:filename'],
+    endpoints: ['server/health_endpoint.txt', '/api/recordings', '/api/uploads/:filename'],
     storageType: useLocalStorage ? 'local' : 'Backblaze B2'
   });
 });
@@ -412,3 +412,16 @@ app.delete('/api/recordings/:id', (req, res) => {
     message: 'Recording removed successfully'
   });
 });
+
+// Helper function to format bytes
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
