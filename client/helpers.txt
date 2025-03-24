@@ -1,0 +1,70 @@
+// Function to add a recording marker to the map
+function addRecordingMarker(recording) {
+    try {
+        // Create a marker element
+        const el = document.createElement('div');
+        el.className = 'marker';
+        
+        // Get audio URL
+        const audioUrl = recording.fileUrl;
+        
+        // Create a popup with recording details
+        const popup = new mapboxgl.Popup({ offset: 25 })
+            .setHTML(`
+                <div class="popup-content">
+                    <strong>${recording.description}</strong>
+                    <p>Uploaded: ${new Date(recording.uploadedAt).toLocaleString()}</p>
+                    <audio controls src="${audioUrl}"></audio>
+                    <button onclick="reportRecording('${recording.id}')" class="report-button">Report Inappropriate Content</button>
+                </div>
+            `);
+        
+        // Add marker to map
+        const marker = new mapboxgl.Marker(el)
+            .setLngLat([recording.location.lng, recording.location.lat])
+            .setPopup(popup)
+            .addTo(map);
+        
+        // Store marker reference
+        markers.push(marker);
+    } catch (error) {
+        console.error('Error adding marker:', error);
+    }
+}
+
+// Function to report a recording
+function reportRecording(id) {
+    alert('Thank you for your report. Our moderators will review this content.');
+    console.log('Recording reported:', id);
+    
+    // Here you could add an actual API call to store reports
+    // fetch(`${API_URL}/recordings/${id}/report`, { method: 'POST' });
+}
+
+// Function to update storage info in the footer
+function updateStorageInfo() {
+    fetch(`${API_URL}/health`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch health info');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Update footer with storage info
+            const footer = document.querySelector('footer p');
+            const storageClass = data.storage.storageClass;
+            const storageWorking = data.storage.working ? 'Active' : 'Inactive';
+            const availableSpace = data.storage.availableSpace;
+            
+            footer.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
+                                 Storage: <span class="storage-indicator ${data.storage.working ? 'active' : 'inactive'}">${storageClass} (${storageWorking})</span>`;
+            
+            if (availableSpace && availableSpace !== 'Unknown') {
+                footer.innerHTML += ` | Space: ${availableSpace}`;
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching storage info:', error);
+        });
+}

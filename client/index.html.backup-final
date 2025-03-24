@@ -249,7 +249,7 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet">
 
     <script>
-        // API endpoint configuration - THIS IS THE KEY CHANGE
+        // API endpoint configuration
         const API_URL = 'https://saigon-soundscape-production.up.railway.app/api';
         
         // Global variables
@@ -296,7 +296,7 @@
         function setMockStorageInfo(element) {
             if (element) {
                 element.innerHTML = `&copy; 2025 Saigon Sound Archive | Created by <a href="https://officinegap.com/" target="_blank">Officine Gặp</a> | 
-                                   Storage: <span class="storage-indicator active">B2 Storage (Active)</span>`;
+                                   Storage: <span class="storage-indicator active">Local Storage (Active)</span>`;
             }
         }
         
@@ -406,8 +406,6 @@
                     console.log('Map initialized successfully, loading recordings');
                     loadRecordings();
                 });
-                
-                console.log('Map initialized successfully');
             } catch (error) {
                 console.error('Error initializing map:', error);
                 const mapContainer = document.getElementById('map');
@@ -476,7 +474,7 @@
             });
         }
         
-        // Handle form submission
+        // Handle audio form submission
         function setupFormHandlers() {
             const uploadButton = document.getElementById('upload-button');
             const formOverlay = document.getElementById('form-overlay');
@@ -484,17 +482,16 @@
             const cancelButton = document.getElementById('cancel-button');
             const audioForm = document.getElementById('audio-form');
             
-            // Open form when clicking + button
+            // Open form with + button
             if (uploadButton) {
                 uploadButton.addEventListener('click', openUploadForm);
             }
             
-            // Close form with X button
+            // Close form buttons
             if (closeFormButton) {
                 closeFormButton.addEventListener('click', closeUploadForm);
             }
             
-            // Close form with Cancel button
             if (cancelButton) {
                 cancelButton.addEventListener('click', closeUploadForm);
             }
@@ -508,7 +505,7 @@
                 });
             }
             
-            // Handle form submission
+            // Form submission
             if (audioForm) {
                 audioForm.addEventListener('submit', function(e) {
                     e.preventDefault();

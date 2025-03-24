@@ -1,0 +1,63 @@
+// Health check endpoint
+app.get('/api/health', async (req, res) => {
+  let b2Status = {
+    working: false,
+    availableSpace: 'Unknown',
+    storageClass: useLocalStorage ? 'Local' : 'Backblaze B2'
+  };
+  
+  // Check Backblaze B2 status
+  if (!useLocalStorage && setupComplete) {
+    try {
+      // Get bucket info to check if connection is working
+      const { data } = await b2.getBucket({ bucketId: process.env.B2_BUCKET_ID || 'ef791392b1a1865094580d1b' });
+      
+      b2Status.working = true;
+      b2Status.bucketName = data.buckets[0].bucketName;
+      
+      // For B2, we could check account info to get quota
+      const accountInfo = await b2.getAccountInfo();
+      if (accountInfo && accountInfo.data) {
+        // B2 doesn't directly provide "available space" in a simple way
+        // This is a simplified representation
+        const totalCapacityBytes = accountInfo.data.absoluteMinimumPartSize;
+        b2Status.availableSpace = formatBytes(totalCapacityBytes);
+      }
+    } catch (error) {
+      console.error('Error checking B2 status:', error);
+      b2Status.working = false;
+      b2Status.error = error.message;
+    }
+  }
+  
+  res.json({
+    status: 'OK',
+    message: 'API server is running',
+    timestamp: new Date().toISOString(),
+    storage: b2Status,
+    recordingsCount: recordings.length,
+    environment: {
+      hasB2KeyId: !!process.env.B2_APPLICATION_KEY_ID,
+      hasB2AppKey: !!process.env.B2_APPLICATION_KEY,
+      hasB2BucketId: !!process.env.B2_BUCKET_ID,
+      hasB2BucketName: !!process.env.B2_BUCKET_NAME,
+      nodeEnv: process.env.NODE_ENV || 'development'
+    },
+    cors: {
+      allowedOrigins: ['https://saigon-soundscape-officinegap.vercel.app', 'http://localhost:3000']
+    }
+  });
+});
+
+// Helper function to format bytes
+function formatBytes(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
