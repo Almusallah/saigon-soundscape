@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Saigon Sound Archive</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 50px; }
+        .storage { background-color: #4CAF50; color: white; padding: 5px 10px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Saigon Sound Archive</h1>
+    <p>Simple test page</p>
+    <p>Storage: <span class="storage">B2 Storage (Active)</span></p>
+</body>
+</html>
