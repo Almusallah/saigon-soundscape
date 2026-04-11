@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const storage_1 = require("../../core/storage");
+const soundscape_controller_1 = require("../controllers/soundscape.controller");
+const router = (0, express_1.Router)();
+router.post('/recordings', storage_1.audioUpload.single('audio'), soundscape_controller_1.SoundscapeController.createRecording);
+router.get('/recordings', soundscape_controller_1.SoundscapeController.getRecordings);
+router.post('/get-upload-url', soundscape_controller_1.SoundscapeController.getSignedUploadUrl);
+exports.default = router;
